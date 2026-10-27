@@ -13,6 +13,7 @@
   --spectral-hover: #1953bd;
   --spectral-lite: #2463d4;
   --gold: #91641c;
+  --star: #f0b323;
   --danger: #b9384c;
   --ok: #278160;
   --feedback: #2463d438;
@@ -40,6 +41,7 @@
   --spectral-hover: #508af4;
   --spectral-lite: #9bbcff;
   --gold: #e9b75f;
+  --star: #ffc83d;
   --danger: #ff9ca9;
   --ok: #82d7b0;
   --feedback: #8bb1ff45;
@@ -101,7 +103,7 @@ button:disabled { cursor: default; }
 .splash-ask { margin: 22px 0 26px; font-size: 15px; line-height: 1.6; color: var(--mist); max-width: 420px; }
 .splash-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .splash-actions .btn { min-height: 46px; padding: 0 22px; font-size: 15px; border-radius: 12px; }
-.splash-star svg, .credit-star svg { width: 16px; height: 16px; fill: currentColor; }
+.splash-star svg, .credit-star svg { width: 16px; height: 16px; fill: var(--star); }
 .splash-continue[aria-disabled="true"] { opacity: 0.5; cursor: progress; }
 .splash-status { min-height: 20px; margin: 18px 0 0; font-size: 13px; color: var(--dim); }
 .splash-status.error { color: var(--danger); }
