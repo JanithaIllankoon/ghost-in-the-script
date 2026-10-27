@@ -7,6 +7,7 @@ import { PhysicalPosition, Window, primaryMonitor } from "@tauri-apps/api/window
 
 import logoUrl from "../assets/logo-256.png";
 import { importFile } from "../shared/importers";
+import { renderSections, shortcutSections } from "../shared/shortcuts";
 import { creditHtml, initSplash, splashHtml } from "./splash";
 import { countWords } from "../shared/markup";
 import { WELCOME_SCRIPT, WELCOME_TITLE } from "../shared/sample";
@@ -21,6 +22,7 @@ import {
   uid,
   type Action,
   type AppData,
+  type HotkeyProblem,
   type PrompterCommand,
   type PrompterStatus,
   type ScrollMode,
@@ -189,14 +191,18 @@ document.getElementById("app")!.innerHTML = `
       <div class="present-body">
       <button class="rec-status unknown" id="rec-status">
         <span class="mark" aria-hidden="true"></span>
-        <span><b id="rec-title">Checking recording visibility…</b><span id="rec-sub"></span></span>
+        <span class="rec-text"><b id="rec-title">Checking recording visibility…</b><span id="rec-sub"></span></span>
+        <span class="rec-change" aria-hidden="true">Change</span>
       </button>
 
+
       <button class="start" id="start">${PLAY}<span id="start-label">Start prompting</span></button>
-      <p class="start-hint" id="start-hint">or press Ctrl+Alt+Space in any app</p>
+      <p class="start-hint"><span id="start-hint">or press Ctrl+Alt+Space in any app</span><br/><button class="link" id="btn-shortcuts">Keyboard shortcuts and gestures (Ctrl+/)</button></p>
+
+      <div class="notices" id="notices" aria-live="polite"></div>
 
       <div class="progress">
-        <button class="bar" id="bar" aria-label="Jump to a point in the script"><span class="fill" id="fill"></span></button>
+        <button class="bar" id="bar" aria-label="Jump to a point in the script" title="Click to jump to that point in the script"><span class="fill" id="fill"></span></button>
         <div class="meta"><span id="elapsed">0:00</span><span id="wpm"></span><span id="remaining">-0:00</span></div>
       </div>
       <div class="nav-row">
@@ -218,8 +224,9 @@ document.getElementById("app")!.innerHTML = `
       </div>
 
       <div class="voice-box" id="voice-box" hidden>
-        <div class="meter" aria-hidden="true"><div class="fill" id="p-meter"></div><div class="mark" id="p-mark"></div></div>
+        <div class="meter" aria-hidden="true" title="Your microphone level. The gold mark is how loud you need to be for it to count as talking."><div class="fill" id="p-meter"></div><div class="mark" id="p-mark"></div></div>
         <div class="heard" id="heard" role="status"></div>
+        <button class="link" id="btn-sensitivity">Adjust sensitivity</button>
       </div>
 
       <div class="quick" id="quick"></div>
@@ -258,6 +265,17 @@ document.getElementById("app")!.innerHTML = `
         <button class="btn" id="dialog-cancel">Cancel</button>
         <button class="btn primary" id="dialog-ok"></button>
       </div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="sheet-backdrop" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" id="sheet">
+      <div class="sheet-head">
+        <h2 id="sheet-title">Shortcuts and gestures</h2>
+        <button class="btn small" id="btn-change-hotkeys">Change hotkeys</button>
+        <button class="btn quiet small" id="btn-close-sheet">Close</button>
+      </div>
+      <div class="sheet-body" id="sheet-body"></div>
     </div>
   </div>
 
@@ -442,7 +460,7 @@ const FONTS = [
   "Trebuchet MS", "Georgia", "Cambria", "Times New Roman", "Sitka Text", "Consolas", "Comic Sans MS",
 ];
 let micDevices: string[] = [];
-let hotkeyProblems: string[] = [];
+let hotkeyProblems: HotkeyProblem[] = [];
 
 const threshold = () => 0.75 - (S().voiceSensitivity / 100) * 0.55;
 
@@ -646,9 +664,9 @@ function renderHotkeys(): HTMLElement {
     toast("Default hotkeys restored");
   }));
   refreshers.push(() => {
-    problems.textContent = hotkeyProblems.length
-      ? `Couldn't set ${hotkeyProblems.join("; ")}. Another app may already use these keys.`
-      : "";
+    problems.textContent = hotkeyProblems
+      .map((p) => `${p.keys} (${ACTION_LABELS[p.action as Action] ?? p.action}) can't be used: ${p.message}. Another app may already own these keys.`)
+      .join(" ");
   });
   return wrap;
 }
@@ -742,9 +760,19 @@ document.addEventListener("keydown", (e) => {
     else if (e.key === "Tab") trapFocus($("dialog-backdrop"), e);
     return;
   }
+  if (!$("sheet-backdrop").hidden) {
+    if (e.key === "Escape") closeSheet();
+    else if (e.key === "Tab") trapFocus($("sheet"), e);
+    return;
+  }
   if (!$("drawer-backdrop").hidden) {
     if (e.key === "Escape") closeSettings();
     else if (e.key === "Tab") trapFocus($("drawer"), e);
+    return;
+  }
+  if (e.ctrlKey && (e.key === "/" || e.code === "Slash")) {
+    e.preventDefault();
+    openSheet();
     return;
   }
   if (e.key === "Escape" && !$("help-pop").hidden) {
@@ -752,6 +780,116 @@ document.addEventListener("keydown", (e) => {
     $("btn-help").focus();
   }
 });
+
+// ---------- Shortcuts sheet ----------
+let sheetReturnFocus: HTMLElement | null = null;
+function openSheet() {
+  const body = $("sheet-body");
+  body.textContent = "";
+  body.appendChild(renderSections(shortcutSections(S(), hotkeyProblems, { editor: true })));
+  sheetReturnFocus = document.activeElement as HTMLElement;
+  $("sheet-backdrop").hidden = false;
+  $("btn-close-sheet").focus();
+}
+function closeSheet() {
+  $("sheet-backdrop").hidden = true;
+  sheetReturnFocus?.focus();
+}
+$("btn-shortcuts").onclick = openSheet;
+$("btn-close-sheet").onclick = closeSheet;
+$("btn-change-hotkeys").onclick = () => {
+  closeSheet();
+  openSettings("hotkeys");
+};
+$("sheet-backdrop").addEventListener("mousedown", (e) => {
+  if (e.target === e.currentTarget) closeSheet();
+});
+$("btn-sensitivity").onclick = () => openSettings("voice");
+
+// ---------- Status strip: anything unusual, each with a one-click fix ----------
+interface Notice {
+  id: string;
+  kind: "warn" | "info";
+  text: string;
+  action?: { label: string; run: () => void };
+}
+let splashDone = false;
+let noticeSig = "";
+
+const keysFor = (a: Action) => S().hotkeys[a]?.replace(/\+/g, " + ") ?? "";
+
+function currentNotices(): Notice[] {
+  const s = S();
+  const out: Notice[] = [];
+  if (s.clickThrough) {
+    const k = keysFor("toggle-click-through");
+    out.push({
+      id: "click-through",
+      kind: "warn",
+      text: `Click-through is on: clicks go to the app under the prompter.${k ? ` ${k} turns it off from any app.` : ""}`,
+      action: { label: "Turn off", run: () => set("clickThrough", false) },
+    });
+  }
+  if (hotkeyProblems.length) {
+    const first = hotkeyProblems[0];
+    const name = ACTION_LABELS[first.action as Action] ?? "a hotkey";
+    out.push({
+      id: "hotkeys",
+      kind: "warn",
+      text: hotkeyProblems.length === 1
+        ? `${first.keys} (${name}) is taken by another app, so it won't work.`
+        : `${hotkeyProblems.length} hotkeys are taken by other apps, so they won't work.`,
+      action: { label: "Change", run: () => openSettings("hotkeys") },
+    });
+  }
+  if (splashDone && status && !status.visible) {
+    const k = keysFor("toggle-prompter");
+    out.push({
+      id: "prompter-hidden",
+      kind: "info",
+      text: `The prompter is hidden.${k ? ` ${k} shows it from any app.` : ""}`,
+      action: { label: "Show", run: () => showPrompter(true) },
+    });
+  }
+  if (s.mode !== "manual" && status && !status.playing && !status.counting && active()?.body.trim()) {
+    out.push({
+      id: "voice-wait",
+      kind: "info",
+      text: s.mode === "follow"
+        ? "Follow my voice starts when you press Start prompting. Then read aloud."
+        : "Voice scrolling starts when you press Start prompting. Then start talking.",
+    });
+  }
+  if (splashDone && s.hideFromTaskbar && !s.seenTrayTip) {
+    const k = keysFor("toggle-controls");
+    out.push({
+      id: "tray-tip",
+      kind: "info",
+      text: `This window stays off the taskbar. Minimising sends it to the tray, by the clock.${k ? ` ${k} brings it back.` : ""}`,
+      action: { label: "Got it", run: () => set("seenTrayTip", true) },
+    });
+  }
+  return out;
+}
+
+function renderNotices() {
+  const list = currentNotices();
+  const sig = list.map((n) => n.id + n.text).join("|");
+  if (sig === noticeSig) return;
+  noticeSig = sig;
+  const host = $("notices");
+  host.textContent = "";
+  for (const n of list) {
+    const row = el("div", `notice ${n.kind}`);
+    row.append(el("span", "dot"), el("span", "text", n.text));
+    if (n.action) {
+      const b = el("button", "btn small", n.action.label);
+      b.onclick = n.action.run;
+      row.appendChild(b);
+    }
+    host.appendChild(row);
+  }
+}
 
 // ---------- Present panel ----------
 function buildPresent() {
@@ -802,9 +940,13 @@ function renderStatus() {
   const start = $<HTMLButtonElement>("start");
   start.disabled = !hasText;
   const hk = S().hotkeys["play-pause"];
+  const hkBroken = hotkeyProblems.some((p) => p.action === "play-pause");
   $("start-hint").textContent = !hasText
     ? "Write or import a script first"
-    : hk ? `or press ${hk.replace(/\+/g, " + ")} in any app` : "Set a hotkey under All settings > Hotkeys";
+    : !hk ? "No play/pause hotkey set"
+    : hkBroken ? `${hk.replace(/\+/g, " + ")} isn't available right now`
+    : `or press ${hk.replace(/\+/g, " + ")} in any app`;
+  renderNotices();
   if (!hasText) start.innerHTML = `${PLAY}<span>Start prompting</span>`;
   if (!st) return;
   if (hasText) {
@@ -825,6 +967,7 @@ function renderStatus() {
   if (st.voice.error) heard.textContent = st.voice.error;
   else if (st.voice.loading) heard.textContent = "Starting the microphone…";
   else if (!st.voice.running) heard.textContent = st.visible ? "Microphone off" : "Microphone off while the prompter is hidden";
+  else if (!st.playing && !st.counting) heard.textContent = `Microphone ready: ${st.voice.device}`;
   else if (st.voice.recognizing) heard.textContent = st.voice.heard ? `Heard: "${st.voice.heard}"` : `Listening on ${st.voice.device}`;
   else heard.textContent = st.voice.speaking ? "Hearing you, scrolling" : `Quiet, paused. Listening on ${st.voice.device}`;
 }
@@ -848,6 +991,26 @@ listen<Partial<Settings>>("gp:patch", (e) => {
   data.settings = { ...S(), ...e.payload };
   save();
   refreshFields();
+});
+
+listen("gp:prompter-hidden", () => {
+  const k = keysFor("toggle-prompter");
+  toast(`Prompter hidden. Use Show prompter${k ? ` or ${k}` : ""} to bring it back.`);
+});
+
+// The window's close button asks before quitting while a script is scrolling.
+listen("gp:close-requested", async () => {
+  const running = status?.playing || (status?.counting ?? 0) > 0;
+  if (running) {
+    const ok = await confirmDialog(
+      "Quit while the script is scrolling?",
+      "Closing this window quits Ghost In The Script, and the prompter closes too.",
+      "Quit",
+    );
+    if (!ok) return;
+  }
+  await saveNow();
+  invoke("quit_app");
 });
 
 listen("gp:prompter-ready", () => {
@@ -1098,13 +1261,17 @@ async function applyTaskbar() {
 }
 
 async function applyHotkeys() {
-  hotkeyProblems = await invoke<string[]>("set_hotkeys", { hotkeys: S().hotkeys }).catch((e) => [String(e)]);
+  hotkeyProblems = await invoke<HotkeyProblem[]>("set_hotkeys", { hotkeys: S().hotkeys }).catch((e) => [
+    { action: "", keys: "Hotkeys", message: String(e) },
+  ]);
   refreshFields();
 }
 
-async function showPrompter() {
+async function showPrompter(focus = false) {
   const w = await Window.getByLabel("prompter");
-  if (w && !(await w.isVisible())) await w.show();
+  if (!w) return;
+  if (!(await w.isVisible())) await w.show();
+  if (focus) await w.setFocus();
 }
 
 $("btn-prompter").onclick = async () => {
@@ -1136,7 +1303,11 @@ async function loadDevices(announce = false) {
 // ---------- Start ----------
 const splash = initSplash({
   // The prompter stays hidden until the person is through the start screen.
-  onContinue: () => showPrompter(),
+  onContinue: () => {
+    splashDone = true;
+    showPrompter();
+    renderNotices();
+  },
   onError: (msg) => toast(msg, true),
 });
 

@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, PhysicalPosition, Runtime, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Runtime, WindowEvent};
 use tauri_plugin_window_state::StateFlags;
 
 pub fn show_window<R: Runtime>(app: &AppHandle<R>, label: &str) {
@@ -66,15 +66,8 @@ fn run_action(app: AppHandle, action: String) {
     hotkeys::run_action(&app, &action);
 }
 
-/// First launch only: put the prompter at the top-centre of the main screen, under the webcam.
-fn place_prompter_first_run(app: &AppHandle) {
-    let state_file = app
-        .path()
-        .app_config_dir()
-        .map(|d| d.join(tauri_plugin_window_state::DEFAULT_FILENAME));
-    if matches!(state_file, Ok(ref p) if p.exists()) {
-        return;
-    }
+/// Puts the prompter at the top centre of the main screen, under a typical webcam.
+pub fn move_prompter_top_centre<R: Runtime>(app: &AppHandle<R>) {
     let Some(w) = app.get_webview_window("prompter") else { return };
     if let (Ok(Some(monitor)), Ok(size)) = (w.primary_monitor(), w.outer_size()) {
         let m = monitor.size();
@@ -85,22 +78,44 @@ fn place_prompter_first_run(app: &AppHandle) {
     }
 }
 
+/// First launch only (no saved window positions yet).
+fn place_prompter_first_run(app: &AppHandle) {
+    let state_file = app
+        .path()
+        .app_config_dir()
+        .map(|d| d.join(tauri_plugin_window_state::DEFAULT_FILENAME));
+    if !matches!(state_file, Ok(ref p) if p.exists()) {
+        move_prompter_top_centre(app);
+    }
+}
+
 fn build_tray(app: &tauri::App) -> tauri::Result<()> {
-    let show = MenuItem::with_id(app, "show", "Show controls", true, None::<&str>)?;
-    let prompter = MenuItem::with_id(app, "prompter", "Show / hide prompter", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Show the main window", true, None::<&str>)?;
+    let prompter = MenuItem::with_id(app, "prompter", "Show / hide the prompter", true, None::<&str>)?;
     let play = MenuItem::with_id(app, "play", "Play / pause", true, None::<&str>)?;
-    let sep = PredefinedMenuItem::separator(app)?;
+    let sep1 = PredefinedMenuItem::separator(app)?;
+    let through = MenuItem::with_id(app, "through-off", "Turn off click-through", true, None::<&str>)?;
+    let centre = MenuItem::with_id(app, "centre", "Move the prompter to the top centre", true, None::<&str>)?;
+    let sep2 = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Ghost In The Script", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &prompter, &play, &sep, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &prompter, &play, &sep1, &through, &centre, &sep2, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id("tray")
-        .tooltip("Ghost In The Script")
+        .tooltip("Ghost In The Script
+Click to open. Right-click for more.")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_window(app, "main"),
             "prompter" => toggle_window(app, "prompter"),
             "play" => hotkeys::run_action(app, "play-pause"),
+            "through-off" => hotkeys::run_action(app, "click-through-off"),
+            "centre" => {
+                move_prompter_top_centre(app);
+                if let Some(w) = app.get_webview_window("prompter") {
+                    let _ = w.show();
+                }
+            }
             "quit" => {
                 voice::stop_all(app);
                 app.exit(0);
@@ -170,6 +185,8 @@ pub fn run() {
                 let hidden = window.app_handle().state::<TaskbarHidden>().0.load(Ordering::SeqCst);
                 if hidden && window.label() == "main" && window.is_minimized().unwrap_or(false) {
                     let _ = window.hide();
+                    // The prompter tells the person where the window went.
+                    let _ = window.app_handle().emit_to("prompter", "gp:main-to-tray", ());
                 }
             }
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -179,10 +196,11 @@ pub fn run() {
                         api.prevent_close();
                         let _ = window.hide();
                     }
-                    // Closing the controls window quits the whole app.
+                    // Closing the main window quits the app. The page decides, so it can
+                    // ask first while a script is scrolling; it then calls `quit_app`.
                     "main" => {
-                        voice::stop_all(window.app_handle());
-                        window.app_handle().exit(0);
+                        api.prevent_close();
+                        let _ = window.app_handle().emit_to("main", "gp:close-requested", ());
                     }
                     _ => {}
                 }

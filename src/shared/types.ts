@@ -104,6 +104,10 @@ export interface Settings {
   /** Keep both windows off the taskbar so recordings can't show a taskbar button. */
   hideFromTaskbar: boolean;
 
+  // One-time tips (not shown in settings)
+  seenPrompterTip: boolean;
+  seenTrayTip: boolean;
+
   hotkeys: Record<Action, string>;
 }
 
@@ -153,6 +157,9 @@ export const DEFAULT_SETTINGS: Settings = {
   hidePrompterFromCapture: true,
   hideControlsFromCapture: true,
   hideFromTaskbar: true,
+
+  seenPrompterTip: false,
+  seenTrayTip: false,
 
   hotkeys: { ...DEFAULT_HOTKEYS },
 };
@@ -223,6 +230,13 @@ export function uid(): string {
 /** Speed setting -> lines per second. Speed 25 is about half a line per second. */
 export function linesPerSecond(speed: number): number {
   return Math.max(0.01, speed) / 50;
+}
+
+/** A global hotkey Windows wouldn't register (usually because another app owns it). */
+export interface HotkeyProblem {
+  action: string;
+  keys: string;
+  message: string;
 }
 
 export interface PrompterStatus {
