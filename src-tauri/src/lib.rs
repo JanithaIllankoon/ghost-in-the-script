@@ -158,14 +158,12 @@ pub fn run() {
         )
         .manage(TaskbarHidden(AtomicBool::new(true)))
         .manage(hotkeys::HotkeyMap::default())
-        .manage(capture::CaptureWanted::default())
         .manage(voice::VoiceState::default())
         .invoke_handler(tauri::generate_handler![
             store::load_data,
             store::save_data,
             capture::set_capture_hidden,
             capture::capture_state,
-            capture::set_screenshot_seconds,
             hotkeys::set_hotkeys,
             voice::voice_devices,
             voice::voice_start,

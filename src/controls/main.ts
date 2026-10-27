@@ -92,8 +92,7 @@ function set<K extends keyof Settings>(key: K, value: Settings[K]) {
   pushSettings();
   if (key === "hidePrompterFromCapture" || key === "hideControlsFromCapture") applyCapture();
   if (key === "hideFromTaskbar") applyTaskbar();
-  if (key === "allowScreenshots") applyHotkeys();
-  if (key === "screenshotSeconds") applyScreenshotSeconds();
+  if (key === "allowScreenshots") applyCapture();
   refreshFields();
 }
 
@@ -543,11 +542,10 @@ const TABS: { id: string; label: string; fields: Field[] }[] = [
     fields: [
       { type: "toggle", key: "hidePrompterFromCapture", label: "Hide the prompter from recordings", hint: "Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing see through it." },
       { type: "toggle", key: "hideControlsFromCapture", label: "Hide this window from recordings" },
-      { type: "toggle", key: "allowScreenshots", label: "Allow screenshots with a hotkey", hint: () => {
+      { type: "toggle", key: "allowScreenshots", label: "Allow screenshots", hint: () => {
         const k = keysFor("screenshot");
-        return `Windows hides a window from screenshots and recordings together, so there's no way to allow only one. ${k ? `${k} makes` : "The hotkey (set it under Hotkeys) makes"} the prompter and this window capturable for a few seconds, then hides them again.`;
+        return `Shows the prompter and this window to Print Screen and Snipping Tool. Windows can't allow screenshots without also allowing recordings, so turn it off before you record.${k ? ` ${k} flips it from any app.` : ""}`;
       } },
-      { type: "range", key: "screenshotSeconds", label: "Screenshot window", min: 2, max: 30, step: 1, fmt: (v) => `${v} s`, hint: "How long they stay visible after the hotkey. Don't use it while recording." },
       { type: "toggle", key: "alwaysOnTop", label: "Keep the prompter on top" },
       { type: "toggle", key: "clickThrough", label: "Clicks pass through the prompter", hint: () => {
         const k = keysFor("toggle-click-through");
@@ -768,7 +766,6 @@ $("btn-reset").onclick = async () => {
   save();
   pushSettings();
   applyCapture();
-  applyScreenshotSeconds();
   applyTaskbar();
   applyHotkeys();
   toast("Settings reset");
@@ -1031,15 +1028,11 @@ listen("gp:prompter-hidden", () => {
   toast(`Prompter hidden. Use Show prompter${k ? ` or ${k}` : ""} to bring it back.`);
 });
 
-listen<number>("gp:screenshot", (e) => {
-  const box = $("rec-status");
-  box.className = "rec-status exposed";
-  $("rec-title").textContent = "Visible to screenshots";
-  $("rec-sub").textContent = `Hides again in ${e.payload} s. Recordings can see it too.`;
-});
-listen("gp:screenshot-end", () => {
-  refreshCaptureStatus();
-  toast("Hidden from screenshots and recordings again");
+// The screenshot hotkey flips the setting, so the switch in All settings always shows the real state.
+listen("gp:toggle-screenshots", () => {
+  const on = !S().allowScreenshots;
+  set("allowScreenshots", on);
+  toast(on ? "Screenshots allowed. The prompter and this window show in screenshots and recordings." : "Screenshots off. The prompter and this window are hidden again.");
 });
 
 // The window's close button asks before quitting while a script is scrolling.
@@ -1273,19 +1266,11 @@ window.addEventListener("drop", (e) => {
 // ---------- Window, capture & hotkeys ----------
 async function applyCapture() {
   const results = await Promise.all(
-    ([["prompter", S().hidePrompterFromCapture], ["main", S().hideControlsFromCapture]] as [string, boolean][]).map(([label, hidden]) =>
+    ([["prompter", S().hidePrompterFromCapture && !S().allowScreenshots], ["main", S().hideControlsFromCapture && !S().allowScreenshots]] as [string, boolean][]).map(([label, hidden]) =>
       invoke<{ hidden: boolean }>("set_capture_hidden", { label, hidden }).then((r) => r.hidden).catch(() => null),
     ),
   );
   showCaptureStatus(results[0], results[1]);
-}
-
-/** Reads what Windows reports for both windows, for the status line (used after a screenshot window closes). */
-async function refreshCaptureStatus() {
-  const [p, c] = await Promise.all(
-    ["prompter", "main"].map((label) => invoke<{ hidden: boolean }>("capture_state", { label }).then((r) => r.hidden).catch(() => null)),
-  );
-  showCaptureStatus(p, c);
 }
 
 function showCaptureStatus(prompterHidden: boolean | null, controlsHidden: boolean | null) {
@@ -1294,6 +1279,12 @@ function showCaptureStatus(prompterHidden: boolean | null, controlsHidden: boole
     box.className = "rec-status exposed";
     $("rec-title").textContent = "Couldn't check recording visibility";
     $("rec-sub").textContent = "Needs Windows 10 version 2004 or newer";
+    return;
+  }
+  if (S().allowScreenshots) {
+    box.className = "rec-status exposed";
+    $("rec-title").textContent = "Screenshots allowed";
+    $("rec-sub").textContent = "Prompter and this window show in recordings too.";
     return;
   }
   if (prompterHidden && controlsHidden) {
@@ -1315,15 +1306,8 @@ async function applyTaskbar() {
   await invoke("set_taskbar_hidden", { hidden: S().hideFromTaskbar }).catch((e) => toast(`Couldn't change the taskbar setting: ${e}`, true));
 }
 
-async function applyScreenshotSeconds() {
-  await invoke("set_screenshot_seconds", { seconds: S().screenshotSeconds }).catch(() => {});
-}
-
 async function applyHotkeys() {
-  // The screenshot hotkey only exists while the setting is on.
-  const hotkeys: Record<string, string> = { ...S().hotkeys };
-  if (!S().allowScreenshots) delete hotkeys.screenshot;
-  hotkeyProblems = await invoke<HotkeyProblem[]>("set_hotkeys", { hotkeys }).catch((e) => [
+  hotkeyProblems = await invoke<HotkeyProblem[]>("set_hotkeys", { hotkeys: S().hotkeys }).catch((e) => [
     { action: "", keys: "Hotkeys", message: String(e) },
   ]);
   refreshFields();
@@ -1392,7 +1376,6 @@ async function init() {
   pushSettings();
   pushScript(true);
   applyCapture();
-  applyScreenshotSeconds();
   applyTaskbar();
   applyHotkeys();
   loadDevices();

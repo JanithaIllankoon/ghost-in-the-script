@@ -30,7 +30,10 @@ pub fn run_action<R: Runtime>(app: &AppHandle<R>, action: &str) {
     match action {
         "toggle-controls" => crate::toggle_window(app, "main"),
         "toggle-prompter" => crate::toggle_window(app, "prompter"),
-        "screenshot" => crate::capture::allow_screenshot(app),
+        // The setting lives in the controls window, so it flips the switch and applies it.
+        "screenshot" => {
+            let _ = app.emit_to("main", "gp:toggle-screenshots", ());
+        }
         other => {
             let _ = app.emit_to("prompter", "gp:hotkey", other.to_string());
         }

@@ -27,7 +27,7 @@ You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right 
 
 **Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The status line at the top of the Present panel reads the setting back from Windows, so a green dot means it's really on. Tested with Panopto.
 
-**Screenshots on request.** Because the hiding covers screenshots too, v1.5.1 adds an opt-in hotkey (**Ctrl+Alt+S**) that lets one screenshot through. See **Limits** below.
+**Screenshots on request.** Because the hiding covers screenshots too, v1.5.1 adds an **Allow screenshots** switch under **All settings > Window**. While it's on, the prompter and the main window show up in Print Screen and Snipping Tool (and in recordings, so turn it off before you record). **Ctrl+Alt+S** flips it from any app.
 
 **Off the taskbar too.** A full-screen recording also captures your taskbar, so by default the app keeps no taskbar button there. Open it from the ghost in the tray, near the clock, or with **Ctrl+Alt+O**. Minimising the main window sends it to the tray. You can turn this off under **All settings > Window**.
 
@@ -104,7 +104,7 @@ The built-in speech model is English. For another language, or better accuracy, 
 ## Limits
 
 - It can't hide from a camera or phone pointed at your screen, or from a hardware capture card.
-- The windows are also hidden from your own screenshots. Windows can't hide a window from recorders but show it to screenshots, so turn on **All settings > Window > Allow screenshots with a hotkey**: **Ctrl+Alt+S** then makes the prompter and main window capturable for a few seconds (you choose how long), and they hide again on their own. Anything recording at that moment can see them too.
+- The windows are also hidden from your own screenshots unless you turn on **Allow screenshots** (**Ctrl+Alt+S**). Windows can't allow screenshots without also allowing recordings.
 - The tray icon near the clock is part of the screen, so a full-screen recording can show it. Windows 11 usually tucks new tray icons into the hidden icons menu (the ^ arrow), and you can keep it there under **Settings > Personalization > Taskbar > Other system tray icons**.
 - Windows only.
 

@@ -5,11 +5,11 @@
 //! sees whatever is behind it instead.
 
 use std::ffi::c_void;
-use std::sync::{mpsc, Mutex};
+use std::sync::mpsc;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
+use tauri::{AppHandle, Manager, WebviewWindow};
 
 const WDA_NONE: u32 = 0x0;
 const WDA_EXCLUDEFROMCAPTURE: u32 = 0x11;
@@ -29,7 +29,7 @@ pub struct CaptureState {
     pub affinity: u32,
 }
 
-fn read_affinity<R: Runtime>(window: &WebviewWindow<R>) -> Result<u32, String> {
+fn read_affinity(window: &WebviewWindow) -> Result<u32, String> {
     let hwnd = window.hwnd().map_err(|e| e.to_string())?;
     let mut value: u32 = 0;
     let ok = unsafe { GetWindowDisplayAffinity(hwnd.0 as *mut c_void, &mut value) };
@@ -39,7 +39,7 @@ fn read_affinity<R: Runtime>(window: &WebviewWindow<R>) -> Result<u32, String> {
     Ok(value)
 }
 
-fn write_affinity<R: Runtime>(window: &WebviewWindow<R>, hidden: bool) -> Result<u32, String> {
+fn write_affinity(window: &WebviewWindow, hidden: bool) -> Result<u32, String> {
     let hwnd = window.hwnd().map_err(|e| e.to_string())?;
     let wanted = if hidden { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE };
     let ok = unsafe { SetWindowDisplayAffinity(hwnd.0 as *mut c_void, wanted) };
@@ -53,8 +53,8 @@ fn write_affinity<R: Runtime>(window: &WebviewWindow<R>, hidden: bool) -> Result
 }
 
 /// Runs a closure on the UI thread (the thread that owns the windows) and waits for the result.
-fn on_main<R: Runtime, T: Send + 'static>(
-    app: &AppHandle<R>,
+fn on_main<T: Send + 'static>(
+    app: &AppHandle,
     f: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
     let (tx, rx) = mpsc::channel();
@@ -66,44 +66,12 @@ fn on_main<R: Runtime, T: Send + 'static>(
         .map_err(|_| "Timed out talking to the window".to_string())?
 }
 
-/// What the person asked for (the hide settings) and whether a screenshot window is open.
-pub struct CaptureWanted(Mutex<Wanted>);
-
-struct Wanted {
-    prompter: bool,
-    main: bool,
-    seconds: u64,
-    /// True while the windows are temporarily capturable for a screenshot.
-    open: bool,
-    /// Bumped on every screenshot request, so an older timer doesn't re-hide a newer window.
-    generation: u64,
-}
-
-impl Default for CaptureWanted {
-    fn default() -> Self {
-        CaptureWanted(Mutex::new(Wanted { prompter: true, main: true, seconds: 5, open: false, generation: 0 }))
-    }
-}
-
-const LABELS: [&str; 2] = ["prompter", "main"];
-
-pub fn set_hidden<R: Runtime>(app: &AppHandle<R>, label: &str, hidden: bool) -> Result<CaptureState, String> {
+pub fn set_hidden(app: &AppHandle, label: &str, hidden: bool) -> Result<CaptureState, String> {
     let window = app
         .get_webview_window(label)
         .ok_or_else(|| format!("No window named {label}"))?;
-    // While a screenshot window is open the new value is only remembered; it applies when the window closes.
-    let defer = {
-        let state = app.state::<CaptureWanted>();
-        let mut w = state.0.lock().unwrap();
-        match label {
-            "prompter" => w.prompter = hidden,
-            "main" => w.main = hidden,
-            _ => {}
-        }
-        w.open
-    };
     on_main(app, move || {
-        let affinity = if defer { read_affinity(&window)? } else { write_affinity(&window, hidden)? };
+        let affinity = write_affinity(&window, hidden)?;
         Ok(CaptureState {
             hidden: affinity == WDA_EXCLUDEFROMCAPTURE,
             affinity,
@@ -111,50 +79,7 @@ pub fn set_hidden<R: Runtime>(app: &AppHandle<R>, label: &str, hidden: bool) -> 
     })
 }
 
-fn apply<R: Runtime>(app: &AppHandle<R>, label: &str, hidden: bool) {
-    if let Some(window) = app.get_webview_window(label) {
-        let _ = on_main(app, move || write_affinity(&window, hidden).map(|_| ()));
-    }
-}
-
-/// Makes both windows capturable for the configured number of seconds, then restores the hide settings.
-/// Runs on its own thread because it waits on the UI thread, which may be the one calling this.
-pub fn allow_screenshot<R: Runtime>(app: &AppHandle<R>) {
-    let (seconds, generation) = {
-        let state = app.state::<CaptureWanted>();
-        let mut w = state.0.lock().unwrap();
-        w.generation += 1;
-        w.open = true;
-        (w.seconds, w.generation)
-    };
-    let app = app.clone();
-    std::thread::spawn(move || {
-        for label in LABELS {
-            apply(&app, label, false);
-        }
-        let _ = app.emit("gp:screenshot", seconds);
-        std::thread::sleep(Duration::from_secs(seconds));
-        let (prompter, main) = {
-            let state = app.state::<CaptureWanted>();
-            let mut w = state.0.lock().unwrap();
-            if w.generation != generation {
-                return;
-            }
-            w.open = false;
-            (w.prompter, w.main)
-        };
-        apply(&app, "prompter", prompter);
-        apply(&app, "main", main);
-        let _ = app.emit("gp:screenshot-end", ());
-    });
-}
-
-#[tauri::command]
-pub fn set_screenshot_seconds(app: AppHandle, seconds: u64) {
-    app.state::<CaptureWanted>().0.lock().unwrap().seconds = seconds.clamp(2, 30);
-}
-
-pub fn get_state<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<CaptureState, String> {
+pub fn get_state(app: &AppHandle, label: &str) -> Result<CaptureState, String> {
     let window = app
         .get_webview_window(label)
         .ok_or_else(|| format!("No window named {label}"))?;
