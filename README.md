@@ -131,6 +131,10 @@ Design choices and the reasoning behind them are in [DESIGN.md](DESIGN.md).
 - [Fredoka](https://fonts.google.com/specimen/Fredoka) font via Fontsource (SIL Open Font License 1.1)
 - [JSZip](https://stuk.github.io/jszip/) for reading Word files (MIT)
 
+## License
+
+[MIT](LICENSE) © 2026 Janitha Illankoon. You can use, change and share the code, including in your own projects, as long as you keep the copyright notice. The bundled third-party parts keep their own licenses, listed above.
+
 ## Support the project
 
 If it saves you a retake, a star on GitHub helps other presenters find it.

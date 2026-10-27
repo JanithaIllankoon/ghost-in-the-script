@@ -3,6 +3,7 @@ name = "ghost-in-the-script"
 version = "1.2.0"
 description = "A teleprompter overlay that stays out of screen recordings"
 authors = ["Janitha Illankoon"]
+license = "MIT"
 repository = "https://github.com/JanithaIllankoon/ghost-in-the-script"
 edition = "2021"
 

@@ -24,6 +24,7 @@
   },
   "description": "A teleprompter overlay for Windows that screen recorders can't see, with voice scrolling.",
   "author": "Janitha Illankoon",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/JanithaIllankoon/ghost-in-the-script.git"
