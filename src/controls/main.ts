@@ -281,11 +281,7 @@ document.getElementById("app")!.innerHTML = `
           <div class="rec-head">
             <span class="rec-icon" aria-hidden="true">${ICONS.eyeOff}</span>
             <b>Recording protection</b>
-            <span class="switch"><input type="checkbox" role="switch" id="rec-switch" aria-label="Hide the prompter and this window from recordings" /><span></span></span>
-          </div>
-          <div class="rec-status unknown" id="rec-status" role="status">
-            <span class="mark" aria-hidden="true"></span>
-            <span class="rec-text"><b id="rec-title">Checking recording visibility…</b><span id="rec-sub"></span></span>
+            <span class="switch rec-switch"><input type="checkbox" role="switch" id="rec-switch" aria-label="Hide the prompter and this window from recordings" /><span></span></span>
           </div>
           <button class="link" id="btn-recording">Recording settings <span aria-hidden="true">↗</span></button>
         </section>
@@ -1370,36 +1366,7 @@ async function applyCapture() {
       invoke<{ hidden: boolean }>("set_capture_hidden", { label, hidden }).then((r) => r.hidden).catch(() => null),
     ),
   );
-  showCaptureStatus(results[0], results[1]);
-}
-
-function showCaptureStatus(prompterHidden: boolean | null, controlsHidden: boolean | null) {
-  const box = $("rec-status");
-  if (prompterHidden === null || controlsHidden === null) {
-    box.className = "rec-status exposed";
-    $("rec-title").textContent = "Couldn't check recording visibility";
-    $("rec-sub").textContent = "Needs Windows 10 version 2004 or newer";
-    return;
-  }
-  if (S().allowScreenshots) {
-    box.className = "rec-status exposed";
-    $("rec-title").textContent = "Screenshots allowed";
-    $("rec-sub").textContent = "Prompter and this window show in recordings too.";
-    return;
-  }
-  if (prompterHidden && controlsHidden) {
-    box.className = "rec-status";
-    $("rec-title").textContent = "Hidden from recordings";
-    $("rec-sub").textContent = "Prompter and this window. Windows confirms it.";
-  } else if (prompterHidden) {
-    box.className = "rec-status";
-    $("rec-title").textContent = "Prompter hidden from recordings";
-    $("rec-sub").textContent = "This window can be recorded";
-  } else {
-    box.className = "rec-status exposed";
-    $("rec-title").textContent = "Prompter shows in recordings";
-    $("rec-sub").textContent = "Select to change";
-  }
+  if (results.some((r) => r === null)) toast("Couldn't change recording visibility. It needs Windows 10 version 2004 or newer.", true);
 }
 
 async function applyTaskbar() {

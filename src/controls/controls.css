@@ -14,6 +14,8 @@
   --spectral-lite: #2463d4;
   --gold: #91641c;
   --star: #f0b323;
+  --switch-on: #2a9d6b;
+  --switch-off: #d6455d;
   --danger: #b9384c;
   --ok: #278160;
   --feedback: #2463d438;
@@ -42,6 +44,8 @@
   --spectral-lite: #9bbcff;
   --gold: #e9b75f;
   --star: #ffc83d;
+  --switch-on: #2fae78;
+  --switch-off: #e5546d;
   --danger: #ff9ca9;
   --ok: #82d7b0;
   --feedback: #8bb1ff45;
@@ -337,14 +341,11 @@ textarea.script:focus-visible { outline-offset: -2px; }
 .rec-head b { flex: 1; font: 600 14.5px var(--font-display); }
 .rec-icon { display: grid; place-items: center; width: 34px; color: var(--mist); }
 .rec-icon svg { width: 22px; height: 22px; }
-.rec-status { display: flex; align-items: flex-start; gap: 10px; padding: 0 0 0 46px; text-align: left; color: var(--ghost); width: 100%; position: relative; }
-.rec-status .mark { position: absolute; left: 34px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
-.rec-status.exposed .mark { background: var(--gold); }
-.rec-status.unknown .mark { background: var(--dim); }
-.rec-status .rec-text { flex: 1; min-width: 0; padding-left: 4px; }
-.rec-status b { display: block; font-size: 13px; font-weight: 600; color: var(--ghost); }
-.rec-status span { display: block; font-size: 12px; color: var(--dim); margin-top: 1px; }
 .rec-card .link { align-self: flex-start; margin-left: 46px; }
+/* Recording protection: green while hiding, red when it's off. */
+.switch.rec-switch input:checked + span { background: var(--switch-on); border-color: var(--switch-on); }
+.switch.rec-switch input:not(:checked) + span { background: var(--switch-off); border-color: var(--switch-off); }
+.switch.rec-switch input:not(:checked) + span::after { background: #fff; }
 
 /* ---------- Fields (shared by Present and Settings) ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; }
