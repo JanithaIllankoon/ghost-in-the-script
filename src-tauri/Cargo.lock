@@ -1327,7 +1327,7 @@ dependencies = [
 
 [[package]]
 name = "ghost-in-the-script"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "cpal",
  "libloading 0.8.9",
