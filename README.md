@@ -45,7 +45,7 @@ Speech recognition runs on your PC with [Vosk](https://alphacephei.com/vosk/). N
 
 ## Install
 
-1. Download `Ghost In The Script_x.y.z_x64-setup.exe` from the [latest release](https://github.com/JanithaIllankoon/ghost-in-the-script/releases/latest).
+1. Download `Ghost-In-The-Script_x.y.z_x64-setup.exe` from the [latest release](https://github.com/JanithaIllankoon/ghost-in-the-script/releases/latest).
 2. Run it. It installs for your Windows user only, so it doesn't need admin rights.
 
 Needs Windows 10 version 2004 or newer, or Windows 11. Windows SmartScreen may warn you because the installer isn't code-signed. Choose **More info**, then **Run anyway**.
