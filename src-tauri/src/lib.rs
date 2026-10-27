@@ -4,6 +4,8 @@ mod store;
 mod voice;
 mod vosk;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, PhysicalPosition, Runtime, WindowEvent};
@@ -32,6 +34,21 @@ pub fn toggle_window<R: Runtime>(app: &AppHandle<R>, label: &str) {
 fn quit_app(app: AppHandle) {
     voice::stop_all(&app);
     app.exit(0);
+}
+
+/// Whether the windows are kept off the taskbar, so a full-screen recording
+/// doesn't show a taskbar button for the app. Matches `skipTaskbar` in tauri.conf.json.
+pub struct TaskbarHidden(pub AtomicBool);
+
+#[tauri::command]
+fn set_taskbar_hidden(app: AppHandle, hidden: bool) -> Result<(), String> {
+    app.state::<TaskbarHidden>().0.store(hidden, Ordering::SeqCst);
+    for label in ["main", "prompter"] {
+        if let Some(w) = app.get_webview_window(label) {
+            w.set_skip_taskbar(hidden).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 pub const REPO_URL: &str = "https://github.com/JanithaIllankoon/ghost-in-the-script";
@@ -124,6 +141,7 @@ pub fn run() {
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
                 .build(),
         )
+        .manage(TaskbarHidden(AtomicBool::new(true)))
         .manage(hotkeys::HotkeyMap::default())
         .manage(voice::VoiceState::default())
         .invoke_handler(tauri::generate_handler![
@@ -138,6 +156,7 @@ pub fn run() {
             quit_app,
             run_action,
             open_github,
+            set_taskbar_hidden,
         ])
         .setup(|app| {
             place_prompter_first_run(app.handle());
@@ -145,6 +164,14 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // Without a taskbar button a minimised window would park in a corner of the
+            // desktop, so send it to the tray instead. The tray icon or Ctrl+Alt+O brings it back.
+            if let WindowEvent::Resized(_) = event {
+                let hidden = window.app_handle().state::<TaskbarHidden>().0.load(Ordering::SeqCst);
+                if hidden && window.label() == "main" && window.is_minimized().unwrap_or(false) {
+                    let _ = window.hide();
+                }
+            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 match window.label() {
                     // Closing the prompter just hides it; it comes back from the controls or tray.

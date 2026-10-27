@@ -101,7 +101,8 @@ export interface Settings {
   clickThrough: boolean;
   hidePrompterFromCapture: boolean;
   hideControlsFromCapture: boolean;
-  showInTaskbar: boolean;
+  /** Keep both windows off the taskbar so recordings can't show a taskbar button. */
+  hideFromTaskbar: boolean;
 
   hotkeys: Record<Action, string>;
 }
@@ -151,7 +152,7 @@ export const DEFAULT_SETTINGS: Settings = {
   clickThrough: false,
   hidePrompterFromCapture: true,
   hideControlsFromCapture: true,
-  showInTaskbar: true,
+  hideFromTaskbar: true,
 
   hotkeys: { ...DEFAULT_HOTKEYS },
 };
@@ -164,16 +165,18 @@ export interface Script {
   updatedAt: number;
 }
 
+/** Version of the save file layout. Each step in `migrate` runs once, then the file is saved at this version. */
+export const DATA_VERSION = 2;
+
 export interface AppData {
-  version: 1;
+  version: number;
   settings: Settings;
   scripts: Script[];
   activeScriptId: string | null;
 }
 
-/** Fills in any settings added in newer versions so old save files keep working. */
-// Colours that shipped as defaults in 1.0. If a saved value still equals one of these,
-// the person never changed it, so it moves to the 1.1 palette.
+// Colours that shipped as defaults in 1.0. A saved value that still equals one of these
+// was never changed, so it moves to the night-sky palette.
 const OLD_DEFAULT_COLORS: Partial<Record<keyof Settings, string>> = {
   textColor: "#ffffff",
   bgColor: "#0b0c10",
@@ -182,22 +185,35 @@ const OLD_DEFAULT_COLORS: Partial<Record<keyof Settings, string>> = {
   guideColor: "#ff4d6d",
 };
 
+function migrate(settings: Settings, raw: Record<string, unknown>, from: number) {
+  const out = settings as unknown as Record<string, unknown>;
+  if (from < 2) {
+    for (const [key, oldValue] of Object.entries(OLD_DEFAULT_COLORS)) {
+      if (String(out[key]).toLowerCase() === oldValue) out[key] = DEFAULT_SETTINGS[key as keyof Settings];
+    }
+    // 1.x only had "show the prompter in the taskbar". It's replaced by one setting for both windows.
+    delete out.showInTaskbar;
+    out.hideFromTaskbar = raw.hideFromTaskbar ?? DEFAULT_SETTINGS.hideFromTaskbar;
+  }
+}
+
+/** Fills in settings added in newer versions and runs one-time migrations, so old save files keep working. */
 export function normalizeData(raw: unknown, fallback: () => AppData): AppData {
   if (!raw || typeof raw !== "object") return fallback();
   const d = raw as Partial<AppData>;
+  const savedSettings = (d.settings ?? {}) as Partial<Settings>;
   const settings: Settings = {
     ...DEFAULT_SETTINGS,
-    ...(d.settings ?? {}),
-    hotkeys: { ...DEFAULT_HOTKEYS, ...(d.settings?.hotkeys ?? {}) },
+    ...savedSettings,
+    hotkeys: { ...DEFAULT_HOTKEYS, ...(savedSettings.hotkeys ?? {}) },
   };
-  for (const [key, oldValue] of Object.entries(OLD_DEFAULT_COLORS) as [keyof Settings, string][]) {
-    if (String(settings[key]).toLowerCase() === oldValue) (settings as unknown as Record<string, unknown>)[key] = DEFAULT_SETTINGS[key];
-  }
+  const from = typeof d.version === "number" ? d.version : 1;
+  migrate(settings, savedSettings as Record<string, unknown>, from);
   const scripts = Array.isArray(d.scripts) ? d.scripts.filter((s) => s && typeof s.id === "string") : [];
   if (scripts.length === 0) return { ...fallback(), settings };
   const activeScriptId =
     d.activeScriptId && scripts.some((s) => s.id === d.activeScriptId) ? d.activeScriptId : scripts[0].id;
-  return { version: 1, settings, scripts, activeScriptId };
+  return { version: DATA_VERSION, settings, scripts, activeScriptId };
 }
 
 export function uid(): string {

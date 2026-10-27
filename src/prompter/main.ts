@@ -9,6 +9,7 @@ type ResizeDirection = Parameters<ReturnType<typeof getCurrentWindow>["startResi
 import { VoiceTracker } from "../shared/align";
 import { renderScript, type RenderedScript } from "../shared/markup";
 import {
+  DATA_VERSION,
   DEFAULT_SETTINGS,
   MODE_LABELS,
   linesPerSecond,
@@ -176,7 +177,6 @@ function applySettings() {
   root.classList.toggle("click-through", s.clickThrough);
 
   win.setAlwaysOnTop(s.alwaysOnTop).catch(() => {});
-  win.setSkipTaskbar(!s.showInTaskbar).catch(() => {});
   win.setIgnoreCursorEvents(s.clickThrough).catch(() => {});
 
   relayout();
@@ -740,7 +740,7 @@ async function init() {
   try {
     const raw = await invoke<string | null>("load_data");
     if (raw) {
-      const data = normalizeData(JSON.parse(raw), () => ({ version: 1, settings: { ...DEFAULT_SETTINGS }, scripts: [], activeScriptId: null }));
+      const data = normalizeData(JSON.parse(raw), () => ({ version: DATA_VERSION, settings: { ...DEFAULT_SETTINGS }, scripts: [], activeScriptId: null }));
       settings = data.settings;
       const s = data.scripts.find((x) => x.id === data.activeScriptId);
       applySettings();

@@ -12,6 +12,7 @@ import { countWords } from "../shared/markup";
 import { WELCOME_SCRIPT, WELCOME_TITLE } from "../shared/sample";
 import {
   ACTION_LABELS,
+  DATA_VERSION,
   DEFAULT_HOTKEYS,
   DEFAULT_SETTINGS,
   MODE_HINTS,
@@ -31,7 +32,7 @@ import {
 function freshData(): AppData {
   const now = Date.now();
   const s: Script = { id: uid(), title: WELCOME_TITLE, body: WELCOME_SCRIPT, createdAt: now, updatedAt: now };
-  return { version: 1, settings: { ...DEFAULT_SETTINGS, hotkeys: { ...DEFAULT_HOTKEYS } }, scripts: [s], activeScriptId: s.id };
+  return { version: DATA_VERSION, settings: { ...DEFAULT_SETTINGS, hotkeys: { ...DEFAULT_HOTKEYS } }, scripts: [s], activeScriptId: s.id };
 }
 
 let data: AppData = freshData();
@@ -87,6 +88,7 @@ function set<K extends keyof Settings>(key: K, value: Settings[K]) {
   save();
   pushSettings();
   if (key === "hidePrompterFromCapture" || key === "hideControlsFromCapture") applyCapture();
+  if (key === "hideFromTaskbar") applyTaskbar();
   refreshFields();
 }
 
@@ -505,7 +507,7 @@ const TABS: { id: string; label: string; fields: Field[] }[] = [
       { type: "toggle", key: "hideControlsFromCapture", label: "Hide this window from recordings" },
       { type: "toggle", key: "alwaysOnTop", label: "Keep the prompter on top" },
       { type: "toggle", key: "clickThrough", label: "Clicks pass through the prompter", hint: "Lets you click the app underneath. Turn it off again with Ctrl+Alt+K." },
-      { type: "toggle", key: "showInTaskbar", label: "Show the prompter in the taskbar" },
+      { type: "toggle", key: "hideFromTaskbar", label: "Hide from the taskbar", hint: "Your recording won't show a ghost button in the taskbar. Open the app from the ghost in the tray, near the clock, or with Ctrl+Alt+O. Minimising sends this window to the tray." },
       { type: "toggle", key: "mirrorH", label: "Mirror left to right", hint: "For teleprompter glass." },
       { type: "toggle", key: "mirrorV", label: "Flip upside down" },
       { type: "custom", render: () => button("Move the prompter under the webcam", centerPrompter) },
@@ -717,6 +719,7 @@ $("btn-reset").onclick = async () => {
   save();
   pushSettings();
   applyCapture();
+  applyTaskbar();
   applyHotkeys();
   toast("Settings reset");
 };
@@ -1090,6 +1093,10 @@ async function applyCapture() {
   }
 }
 
+async function applyTaskbar() {
+  await invoke("set_taskbar_hidden", { hidden: S().hideFromTaskbar }).catch((e) => toast(`Couldn't change the taskbar setting: ${e}`, true));
+}
+
 async function applyHotkeys() {
   hotkeyProblems = await invoke<string[]>("set_hotkeys", { hotkeys: S().hotkeys }).catch((e) => [String(e)]);
   refreshFields();
@@ -1152,6 +1159,7 @@ async function init() {
   pushSettings();
   pushScript(true);
   applyCapture();
+  applyTaskbar();
   applyHotkeys();
   loadDevices();
   setInterval(renderList, 60000);

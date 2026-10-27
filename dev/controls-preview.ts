@@ -37,6 +37,9 @@ const handler = async (cmd: string, args: any): Promise<unknown> => {
         return { hidden: args.hidden, affinity: args.hidden ? 0x11 : 0 };
       case "set_hotkeys":
         return Object.values(args.hotkeys).includes("Ctrl+Alt+F1") ? ["Ctrl+Alt+F1: already registered"] : [];
+      case "set_taskbar_hidden":
+        (window as any).__taskbarHidden = args.hidden;
+        return null;
       case "open_github":
         if (flags.get("fail") === "github") throw "No default browser";
         (window as any).__githubOpened = ((window as any).__githubOpened ?? 0) + 1;

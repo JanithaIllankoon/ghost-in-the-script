@@ -25,6 +25,8 @@ You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right 
 
 **Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The card at the top of the Present panel reads the setting back from Windows, so a green dot means it's really on. Tested with Panopto.
 
+**Off the taskbar too.** A full-screen recording also captures your taskbar, so by default the app keeps no taskbar button there. Open it from the ghost in the tray, near the clock, or with **Ctrl+Alt+O**. Minimising the main window sends it to the tray. You can turn this off under **All settings > Window**.
+
 **Three ways to scroll.**
 
 | Mode | What happens |
@@ -93,6 +95,7 @@ The built-in speech model is English. For another language, or better accuracy, 
 
 - It can't hide from a camera or phone pointed at your screen, or from a hardware capture card.
 - The windows are also hidden from your own screenshots.
+- The tray icon near the clock is part of the screen, so a full-screen recording can show it. Windows 11 usually tucks new tray icons into the hidden icons menu (the ^ arrow), and you can keep it there under **Settings > Personalization > Taskbar > Other system tray icons**.
 - Windows only.
 
 ## Your data
