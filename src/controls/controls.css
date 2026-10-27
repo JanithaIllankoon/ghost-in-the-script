@@ -495,17 +495,17 @@ input[type="color"].swatch::-webkit-color-swatch { border: none; border-radius: 
 .notices { display: flex; flex-direction: column; gap: 8px; }
 .notices:empty { display: none; }
 .notice {
-  display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 6px 10px;
-  padding: 12px 10px 12px 14px; border-radius: 12px;
+  display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; row-gap: 2px;
+  padding: 12px 14px 12px 10px; border-radius: 12px;
   background: color-mix(in srgb, var(--spectral) 10%, transparent); border: none;
   font-size: 12.5px; line-height: 1.45; color: var(--mist);
 }
 .notice.warn { background: color-mix(in srgb, var(--star) 14%, transparent); color: var(--ghost); }
-.notice .text { min-width: 0; padding-top: 2px; }
-.notice-close { display: grid; place-items: center; width: 24px; height: 24px; margin: -2px 0 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--dim); }
+.notice .text { grid-column: 2; min-width: 0; }
+.notice-close { grid-column: 1; grid-row: 1 / span 2; align-self: center; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--mist); }
 .notice-close:hover { background: color-mix(in srgb, var(--ghost) 10%, transparent); color: var(--ghost); }
-.notice-close svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.notice .btn { grid-column: 1; justify-self: start; background: transparent; border-color: transparent; color: var(--spectral-lite); padding-left: 0; }
+.notice-close svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.notice .btn { grid-column: 2; justify-self: start; min-height: 26px; background: transparent; border-color: transparent; color: var(--spectral-lite); padding-left: 0; }
 .notice .btn:hover { background: transparent; text-decoration: underline; text-underline-offset: 3px; }
 
 /* Text-style buttons for secondary actions. */

@@ -987,7 +987,7 @@ function renderNotices() {
       n.onClose?.();
       renderNotices();
     };
-    row.append(el("span", "text", n.text), close);
+    row.append(close, el("span", "text", n.text));
     if (n.action) {
       const b = el("button", "btn small", n.action.label);
       b.onclick = n.action.run;
