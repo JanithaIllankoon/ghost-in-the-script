@@ -197,7 +197,7 @@ document.getElementById("app")!.innerHTML = `
 
 
       <button class="start" id="start">${PLAY}<span id="start-label">Start prompting</span></button>
-      <p class="start-hint"><span id="start-hint">or press Ctrl+Alt+Space in any app</span><br/><button class="link" id="btn-shortcuts">Keyboard shortcuts and gestures (Ctrl+/)</button></p>
+      <p class="start-hint"><span id="start-hint"></span><br/><button class="link" id="btn-shortcuts">Keyboard shortcuts and gestures (Ctrl+/)</button></p>
 
       <div class="notices" id="notices" aria-live="polite"></div>
 
@@ -327,13 +327,16 @@ $("dialog-backdrop").addEventListener("mousedown", (e) => {
 });
 
 // ---------- Fields ----------
+/** Fixed text, or a function for hints that mention settings which can change (like hotkeys). */
+type Hint = string | (() => string);
+
 type Field =
-  | { type: "range"; key: keyof Settings; label: string; min: number; max: number; step: number; unit?: string; fmt?: (v: number) => string; hint?: string }
+  | { type: "range"; key: keyof Settings; label: string; min: number; max: number; step: number; unit?: string; fmt?: (v: number) => string; hint?: Hint }
   | { type: "color"; key: keyof Settings; label: string }
-  | { type: "toggle"; key: keyof Settings; label: string; hint?: string }
-  | { type: "select"; key: keyof Settings; label: string; options: [string, string][] | (() => [string, string][]); hint?: string }
+  | { type: "toggle"; key: keyof Settings; label: string; hint?: Hint }
+  | { type: "select"; key: keyof Settings; label: string; options: [string, string][] | (() => [string, string][]); hint?: Hint }
   | { type: "seg"; key: keyof Settings; label: string; options: [string, string][] }
-  | { type: "text"; key: keyof Settings; label: string; placeholder?: string; hint?: string }
+  | { type: "text"; key: keyof Settings; label: string; placeholder?: string; hint?: Hint }
   | { type: "heading"; text: string }
   | { type: "custom"; render: () => HTMLElement };
 
@@ -432,7 +435,9 @@ function renderField(f: Field): HTMLElement {
     });
   }
   if ("hint" in f && f.hint) {
-    const h = el("div", "hint", f.hint);
+    const hint = f.hint;
+    const h = el("div", "hint", typeof hint === "function" ? hint() : hint);
+    if (typeof hint === "function") refreshers.push(() => (h.textContent = hint()));
     if (wrap.classList.contains("inline")) {
       const outer = el("div", "field-wrap");
       outer.append(wrap, h);
@@ -524,8 +529,14 @@ const TABS: { id: string; label: string; fields: Field[] }[] = [
       { type: "toggle", key: "hidePrompterFromCapture", label: "Hide the prompter from recordings", hint: "Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing see through it." },
       { type: "toggle", key: "hideControlsFromCapture", label: "Hide this window from recordings" },
       { type: "toggle", key: "alwaysOnTop", label: "Keep the prompter on top" },
-      { type: "toggle", key: "clickThrough", label: "Clicks pass through the prompter", hint: "Lets you click the app underneath. Turn it off again with Ctrl+Alt+K." },
-      { type: "toggle", key: "hideFromTaskbar", label: "Hide from the taskbar", hint: "Your recording won't show a ghost button in the taskbar. Open the app from the ghost in the tray, near the clock, or with Ctrl+Alt+O. Minimising sends this window to the tray." },
+      { type: "toggle", key: "clickThrough", label: "Clicks pass through the prompter", hint: () => {
+        const k = keysFor("toggle-click-through");
+        return `Lets you click the app underneath. Turn it off with this switch${k ? `, ${k}` : ""} or the tray menu.`;
+      } },
+      { type: "toggle", key: "hideFromTaskbar", label: "Hide from the taskbar", hint: () => {
+        const k = keysFor("toggle-controls");
+        return `Your recording won't show a ghost button in the taskbar. Open the app from the ghost in the tray, near the clock${k ? `, or with ${k}` : ""}. Minimising sends this window to the tray.`;
+      } },
       { type: "toggle", key: "mirrorH", label: "Mirror left to right", hint: "For teleprompter glass." },
       { type: "toggle", key: "mirrorV", label: "Flip upside down" },
       { type: "custom", render: () => button("Move the prompter under the webcam", centerPrompter) },
