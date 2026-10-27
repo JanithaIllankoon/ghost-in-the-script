@@ -9,6 +9,7 @@ import logoUrl from "../assets/logo-256.png";
 import { importFile } from "../shared/importers";
 import { renderSections, shortcutSections } from "../shared/shortcuts";
 import { creditHtml, initSplash, splashHtml } from "./splash";
+import { initTheme } from "./theme";
 import { countWords } from "../shared/markup";
 import { WELCOME_SCRIPT, WELCOME_TITLE } from "../shared/sample";
 import {
@@ -106,25 +107,25 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>';
 const PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4.5" height="15" rx="1.2"/><rect x="13.5" y="4.5" width="4.5" height="15" rx="1.2"/></svg>';
 
-/** The ghost's wavy hem, drawn as a row of soft scallops. */
-function hemSvg(): string {
-  let d = "M0 0 H240 V4";
-  for (let x = 240; x > 0; x -= 30) d += ` Q${x - 7.5} 14 ${x - 15} 6 Q${x - 22.5} 0 ${x - 30} 6`;
-  d += " V0 Z";
-  return `<svg class="hem" viewBox="0 0 240 14" preserveAspectRatio="none" aria-hidden="true"><path d="${d}" fill="currentColor"/></svg>`;
-}
-
 // ---------- Layout ----------
 document.getElementById("app")!.innerHTML = `
   ${splashHtml()}
 
+  <header class="app-header">
+    <div class="brand">
+      <img src="${logoUrl}" alt="Ghost In The Script logo" />
+      <div class="name">Ghost In The Script<small>A little less seen. A lot more confident.</small></div>
+    </div>
+    <div class="header-actions">
+      <span class="version">v1.5.0</span>
+      <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
+        <span id="theme-label">Light mode</span><span class="theme-track" aria-hidden="true"><span></span></span>
+      </button>
+    </div>
+  </header>
   <div class="shell">
     <aside class="scripts" aria-label="Scripts">
-      <div class="brand">
-        <img src="${logoUrl}" alt="Ghost In The Script logo" />
-        <div class="name">Ghost In The Script<small>Your prompter, unseen by recorders</small></div>
-      </div>
-      ${hemSvg()}
+      <div class="section-heading"><span class="eyebrow">WORKSPACE</span><h1>Scripts</h1></div>
       <div class="scripts-actions">
         <button class="btn primary small" id="btn-new">New script</button>
         <button class="btn small" id="btn-import">Import file</button>
@@ -142,6 +143,7 @@ document.getElementById("app")!.innerHTML = `
     </aside>
 
     <main class="write" aria-label="Script editor">
+      <div class="editor-heading"><span class="eyebrow">SCRIPT EDITOR</span><span class="editor-note">Your next great take starts here.</span></div>
       <div class="banner" id="save-error" role="alert" hidden>
         <span id="save-error-text"></span>
         <button class="btn small" id="btn-retry-save">Try again</button>
@@ -189,13 +191,14 @@ document.getElementById("app")!.innerHTML = `
 
     <aside class="present" aria-label="Present">
       <div class="present-body">
-      <button class="rec-status unknown" id="rec-status">
+      <div class="section-heading"><span class="eyebrow">READY WHEN YOU ARE</span><h2>Present</h2></div>
+      <div class="recording-section">
+      <div class="rec-status unknown" id="rec-status" role="status">
         <span class="mark" aria-hidden="true"></span>
         <span class="rec-text"><b id="rec-title">Checking recording visibility…</b><span id="rec-sub"></span></span>
-        <span class="rec-change" aria-hidden="true">Change</span>
-      </button>
-
-
+      </div>
+      <button class="btn quiet small" id="btn-recording">Recording settings <span aria-hidden="true">↗</span></button>
+      </div>
       <button class="start" id="start">${PLAY}<span id="start-label">Start prompting</span></button>
       <p class="start-hint"><span id="start-hint"></span><br/><button class="link" id="btn-shortcuts">Keyboard shortcuts and gestures (Ctrl+/)</button></p>
 
@@ -280,6 +283,16 @@ document.getElementById("app")!.innerHTML = `
   </div>
 
   <div class="toast" id="toast" role="status" hidden></div>`;
+
+initTheme();
+document.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest("button");
+  if (!button || button.disabled || button.getAttribute("aria-disabled") === "true" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  button.animate([
+    { boxShadow: "0 0 0 0 var(--feedback)" },
+    { boxShadow: "0 0 0 5px transparent" },
+  ], { duration: 380, easing: "ease-out" });
+});
 
 // ---------- Toast, dialog, save errors ----------
 let toastTimer: number | undefined;
@@ -936,7 +949,7 @@ $("bar").onkeydown = (e) => {
   else return;
   e.preventDefault();
 };
-$("rec-status").onclick = () => openSettings("window");
+$("btn-recording").onclick = () => openSettings("window");
 
 let status: PrompterStatus | null = null;
 function fmt(sec: number) {
@@ -950,6 +963,7 @@ function renderStatus() {
   const hasText = !!active()?.body.trim();
   const start = $<HTMLButtonElement>("start");
   start.disabled = !hasText;
+  start.dataset.playing = String(hasText && !!st && (st.playing || st.counting > 0));
   const hk = S().hotkeys["play-pause"];
   const hkBroken = hotkeyProblems.some((p) => p.action === "play-pause");
   $("start-hint").textContent = !hasText

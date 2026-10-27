@@ -19,11 +19,13 @@
 
 You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right under your webcam so you can read it while looking at the camera. The recording only shows your slides.
 
-![The main window: scripts on the left, the editor in the middle, and the Present panel on the right](docs/main.png)
+![The main window: scripts on the left, the editor in the middle, and the Present panel on the right](docs/v1.5.0/light.png)
 
 ## What it does
 
-**Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The card at the top of the Present panel reads the setting back from Windows, so a green dot means it's really on. Tested with Panopto.
+**Light and dark themes.** v1.5.0 adds a clean workspace with a roomier Present panel, plain status lines, and hover and click feedback. Use the switch in the top-right corner to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. [See dark mode](docs/v1.5.0/dark.png).
+
+**Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The status line at the top of the Present panel reads the setting back from Windows, so a green dot means it's really on. Tested with Panopto.
 
 **Off the taskbar too.** A full-screen recording also captures your taskbar, so by default the app keeps no taskbar button there. Open it from the ghost in the tray, near the clock, or with **Ctrl+Alt+O**. Minimising the main window sends it to the tray. You can turn this off under **All settings > Window**.
 
