@@ -280,3 +280,73 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Discoverability ---------- */
+/* Click-through badge: tells you it's on and how to undo it. Only you see it (the window is hidden from recordings). */
+#ct-chip {
+  position: absolute; left: 10px; top: 10px; z-index: 6;
+  padding: 4px 10px; border-radius: 8px;
+  background: rgba(11, 24, 71, 0.92); border: 1px solid rgba(233, 183, 95, 0.6);
+  color: #eef0fb; font: 600 12px/1.3 "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  pointer-events: none;
+}
+#ct-chip[hidden], #tip[hidden], #help[hidden] { display: none; }
+
+/* First-run tip, pinned under the toolbar. */
+#tip {
+  position: absolute; top: 50px; left: 50%; transform: translateX(-50%); z-index: 11;
+  width: min(360px, calc(100% - 24px)); padding: 12px 14px 12px;
+  border-radius: 12px; background: #13235e; border: 1px solid #7fa8ff;
+  box-shadow: 0 10px 28px rgba(0, 4, 20, 0.55);
+  color: #b7c7fb; font: 13px/1.5 "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+#tip::before {
+  content: ""; position: absolute; top: -7px; left: 50%; width: 12px; height: 12px;
+  transform: translateX(-50%) rotate(45deg); background: #13235e;
+  border-left: 1px solid #7fa8ff; border-top: 1px solid #7fa8ff;
+}
+#tip p { margin: 0 0 6px; }
+#tip b { color: #eef0fb; }
+#tip button, #help button {
+  all: unset; box-sizing: border-box; cursor: pointer;
+  padding: 6px 14px; border-radius: 8px; background: #2f6fe8; color: #fff;
+  font: 600 12.5px "Segoe UI", sans-serif;
+}
+#tip button:hover, #help button:hover { background: #3b7bf5; }
+#tip button:focus-visible, #help button:focus-visible { outline: 2px solid #7fa8ff; outline-offset: 2px; }
+
+/* While teaching, the resize edges are drawn so you can see where to grab. */
+#root.teaching { box-shadow: inset 0 0 0 2px rgba(127, 168, 255, 0.85); }
+#root.teaching .grip-r.se::after,
+#root.teaching .grip-r.sw::after { content: ""; position: absolute; width: 8px; height: 8px; bottom: 3px; border-bottom: 2px solid #7fa8ff; }
+#root.teaching .grip-r.se::after { right: 3px; border-right: 2px solid #7fa8ff; }
+#root.teaching .grip-r.sw::after { left: 3px; border-left: 2px solid #7fa8ff; }
+
+/* Shortcuts sheet inside the prompter */
+#help {
+  position: absolute; inset: 0; z-index: 30;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 10px; background: rgba(2, 6, 22, 0.55); overflow: auto;
+}
+.help-card {
+  width: min(640px, 100%); border-radius: 12px;
+  background: #0b1847; border: 1px solid #22377d; color: #eef0fb;
+  font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+.help-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #22377d; position: sticky; top: 0; background: #0b1847; border-radius: 12px 12px 0 0; }
+.help-head h2 { margin: 0; flex: 1; font: 600 16px "Fredoka", "Segoe UI", sans-serif; }
+.help-body { padding: 10px 14px 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 22px; }
+.sc-section h3 { margin: 0 0 2px; font: 600 14px "Fredoka", "Segoe UI", sans-serif; }
+.sc-note { margin: 0 0 6px; font-size: 11.5px; color: #8d9fd6; }
+.sc-section dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; align-items: baseline; }
+.sc-section dt { white-space: nowrap; }
+.sc-section dd { margin: 0; color: #b7c7fb; font-size: 12.5px; }
+.sc-problem { display: block; font-size: 11.5px; color: #e9b75f; }
+.keys { font-size: 11.5px; color: #8d9fd6; }
+.keys.mouse { color: #eef0fb; font-weight: 600; font-size: 12px; }
+.keys.unset { font-style: italic; }
+kbd {
+  display: inline-block; min-width: 20px; padding: 1px 5px; margin: 0 1px;
+  border-radius: 5px; border: 1px solid #22377d; border-bottom-width: 2px;
+  background: #13235e; color: #eef0fb; font: 600 11px/1.4 "Segoe UI", sans-serif; text-align: center;
+}

@@ -127,10 +127,17 @@ export function initSplash(opts: SplashOptions) {
       });
     }
     const flight = ghost.animate(frames, { duration: 1500, easing: "linear", fill: "forwards" });
-    flight.onfinish = () => {
+    // Animations pause while a window is hidden or minimised, so a timer makes sure
+    // the app still opens even if the flight never gets to finish.
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
       ghost.remove();
       done();
     };
+    flight.onfinish = finish;
+    setTimeout(finish, 1900);
   }
 
   return {

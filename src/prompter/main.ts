@@ -8,6 +8,7 @@ type ResizeDirection = Parameters<ReturnType<typeof getCurrentWindow>["startResi
 
 import { VoiceTracker } from "../shared/align";
 import { renderScript, type RenderedScript } from "../shared/markup";
+import { renderSections, shortcutSections } from "../shared/shortcuts";
 import {
   DATA_VERSION,
   DEFAULT_SETTINGS,
@@ -45,8 +46,20 @@ document.getElementById("app")!.innerHTML = `
     <div id="progress"><div id="progress-bar"></div></div>
     <div id="timer"></div>
     <div id="toast"></div>
+    <div id="ct-chip" hidden></div>
+    <div id="tip" role="dialog" aria-label="How to move the prompter" hidden>
+      <p><b>Drag this bar</b> to move the prompter. <b>Drag any edge</b> to resize it.</p>
+      <p>Press <b>?</b> on the bar for every shortcut. Hold Alt and drag to move it from anywhere.</p>
+      <button id="tip-ok">Got it</button>
+    </div>
+    <div id="help" role="dialog" aria-modal="true" aria-label="Shortcuts and gestures" hidden>
+      <div class="help-card">
+        <div class="help-head"><h2>Shortcuts and gestures</h2><button id="help-close">Close</button></div>
+        <div class="help-body" id="help-body"></div>
+      </div>
+    </div>
     <div id="toolbar" data-tauri-drag-region>
-      <span class="grip" data-tauri-drag-region>⋮⋮</span>
+      <span class="grip" data-tauri-drag-region title="Drag to move the prompter">⋮⋮</span>
       <button id="tb-play" title="Play or pause (Space)" aria-label="Play or pause">${ICON.play}</button>
       <button id="tb-rewind" title="Back to the start (Home)" aria-label="Back to the start">${ICON.rewind}</button>
       <span class="sep"></span>
@@ -59,6 +72,7 @@ document.getElementById("app")!.innerHTML = `
       <span class="sep"></span>
       <button id="tb-through" class="text" title="Clicks pass through to the app underneath (Ctrl+Alt+K)">Click-through</button>
       <button id="tb-controls" class="text" title="Open the main window">Controls</button>
+      <button id="tb-help" class="text" title="Shortcuts and gestures (Ctrl+/)" aria-label="Shortcuts and gestures">?</button>
       <button id="tb-hide" title="Hide the prompter (Ctrl+Alt+P brings it back)" aria-label="Hide the prompter">${ICON.close}</button>
     </div>
     ${["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((d) => `<div class="grip-r ${d}" data-dir="${d}"></div>`).join("")}
@@ -172,7 +186,13 @@ function applySettings() {
 
   $("tb-speed").textContent = String(s.speed);
   $("tb-mode").textContent = { manual: "Fixed", voice: "Voice", follow: "Follow" }[s.mode];
-  $("tb-mode").title = `Scroll mode: ${MODE_LABELS[s.mode]} (M)`;
+  const order: ScrollMode[] = ["manual", "voice", "follow"];
+  const next = order[(order.indexOf(s.mode) + 1) % order.length];
+  $("tb-mode").title = `Scroll mode: ${MODE_LABELS[s.mode]}. Click to switch to ${MODE_LABELS[next]} (M)`;
+  const ctKeys = s.hotkeys["toggle-click-through"];
+  const chip = $("ct-chip");
+  chip.hidden = !s.clickThrough;
+  chip.textContent = ctKeys ? `Click-through on · ${ctKeys.replace(/\+/g, " + ")} turns it off` : "Click-through on · turn it off from the tray icon";
   $("tb-through").classList.toggle("active", s.clickThrough);
   root.classList.toggle("click-through", s.clickThrough);
 
@@ -308,6 +328,7 @@ function play() {
 }
 
 function startPlaying() {
+  if (tipShowing) dismissTip();
   counting = 0;
   playing = true;
   velocity = 0;
@@ -396,7 +417,22 @@ function runAction(a: Action | string) {
     case "toggle-click-through": {
       const on = !settings.clickThrough;
       patchSettings({ clickThrough: on });
-      toast(on ? "Click-through on: clicks pass through the prompter" : "Click-through off");
+      const k = settings.hotkeys["toggle-click-through"];
+      if (on) {
+        // The toolbar can't be clicked any more, so get it out of the way of the badge.
+        toolbar.classList.remove("on");
+        root.classList.remove("hovered");
+      }
+      toast(on
+        ? `Click-through on: clicks go to the app underneath. ${k ? `Press ${k.replace(/\+/g, " + ")}` : "Use the tray icon"} to turn it off.`
+        : "Click-through off", false, on ? 5000 : 2600);
+      break;
+    }
+    case "click-through-off": {
+      if (settings.clickThrough) {
+        patchSettings({ clickThrough: false });
+        toast("Click-through off");
+      }
       break;
     }
   }
@@ -441,7 +477,12 @@ function frame(now: number) {
   draw();
 
   const mic = $("tb-mic");
-  mic.className = `mic ${voice.running ? (speaking && voiceLevel > 0 ? "live" : "idle") : ""}`;
+  const micState = voice.running ? (speaking && voiceLevel > 0 ? "live" : "idle") : "";
+  if (mic.dataset.state !== micState) {
+    mic.dataset.state = micState;
+    mic.className = `mic ${micState}`;
+    mic.title = micState === "live" ? "Microphone: hearing you" : micState === "idle" ? "Microphone on, no speech right now" : "Microphone off (fixed speed mode)";
+  }
 
   if (now - lastTimerDraw > 250) drawTimer(now);
   requestAnimationFrame(frame);
@@ -513,6 +554,7 @@ setInterval(async () => {
   const nowVisible = await win.isVisible().catch(() => true);
   if (nowVisible !== visible) {
     visible = nowVisible;
+    if (visible) maybeShowTip();
     if (!visible) stop();
     syncVoice(); // release the microphone while hidden
   }
@@ -639,12 +681,55 @@ $("tb-faster").onclick = () => changeSpeed(+1);
 $("tb-mode").onclick = () => runAction("cycle-mode");
 $("tb-through").onclick = () => runAction("toggle-click-through");
 $("tb-controls").onclick = () => invoke("run_action", { action: "toggle-controls" });
-$("tb-hide").onclick = () => win.hide();
+$("tb-hide").onclick = () => {
+  emitTo("main", "gp:prompter-hidden", null).catch(() => {});
+  win.hide();
+};
+$("tb-help").onclick = () => openHelp();
+$("help-close").onclick = () => closeHelp();
+$("help").addEventListener("mousedown", (ev) => {
+  if (ev.target === ev.currentTarget) closeHelp();
+});
+$("tip-ok").onclick = () => dismissTip();
+
+function openHelp() {
+  const body = $("help-body");
+  body.textContent = "";
+  body.appendChild(renderSections(shortcutSections(settings, [], { editor: false })));
+  $("help").hidden = false;
+  $("help-close").focus();
+}
+function closeHelp() {
+  $("help").hidden = true;
+}
+
+// One-time tip: keeps the toolbar up and outlines the edges so moving and resizing are obvious.
+let tipShowing = false;
+function maybeShowTip() {
+  if (settings.seenPrompterTip || tipShowing || !visible || rendered.wordCount === 0) return;
+  tipShowing = true;
+  $("tip").hidden = false;
+  root.classList.add("teaching");
+  toolbar.classList.add("on");
+}
+function dismissTip() {
+  if (!tipShowing) return;
+  tipShowing = false;
+  $("tip").hidden = true;
+  root.classList.remove("teaching");
+  patchSettings({ seenPrompterTip: true });
+  showToolbar();
+}
+
+listen("gp:main-to-tray", () => {
+  const k = settings.hotkeys["toggle-controls"];
+  toast(`The main window is in the tray, near the clock. ${k ? `${k.replace(/\+/g, " + ")} brings it back.` : "Click the ghost there to bring it back."}`, false, 4500);
+});
 
 // Toolbar shows while the mouse is over the window
 let hideToolbarTimer: number | undefined;
 function showToolbar() {
-  if (settings.clickThrough) return;
+  if (settings.clickThrough || tipShowing) return;
   toolbar.classList.add("on");
   root.classList.add("hovered");
   clearTimeout(hideToolbarTimer);
@@ -657,6 +742,7 @@ function showToolbar() {
 }
 document.addEventListener("mousemove", showToolbar);
 document.addEventListener("mouseleave", () => {
+  if (tipShowing) return;
   toolbar.classList.remove("on");
   root.classList.remove("hovered");
 });
@@ -719,7 +805,12 @@ content.addEventListener("dblclick", (ev) => {
 // Keyboard (when the prompter itself has focus)
 window.addEventListener("keydown", (ev) => {
   const k = ev.key;
-  if (k === " ") { ev.preventDefault(); togglePlay(); }
+  if (!$("help").hidden) {
+    if (k === "Escape" || k === "?") { ev.preventDefault(); closeHelp(); }
+    return;
+  }
+  if ((ev.ctrlKey && (k === "/" || ev.code === "Slash")) || k === "?") { ev.preventDefault(); openHelp(); return; }
+  if (k === " ") { ev.preventDefault(); if (tipShowing) dismissTip(); togglePlay(); }
   else if (k === "ArrowUp" || k === "+" || k === "=") changeSpeed(+1);
   else if (k === "ArrowDown" || k === "-") changeSpeed(-1);
   else if (k === "PageUp" || k === "ArrowLeft") nudge(-1);
@@ -754,6 +845,8 @@ async function init() {
   }
   // Ask the controls window for the latest (possibly unsaved) state.
   emitTo("main", "gp:prompter-ready", null).catch(() => {});
+  visible = await win.isVisible().catch(() => true);
+  maybeShowTip();
   requestAnimationFrame(frame);
 }
 

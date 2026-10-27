@@ -1,5 +1,6 @@
 // Dev-only harness: runs the controls window in a normal browser by faking the Rust side.
-// Not part of the app build. URL flags: ?fail=load, ?fail=save, ?capture=fail, ?empty=1, ?skip=1 (skip the start screen)
+// Not part of the app build. URL flags: ?fail=load, ?fail=save, ?capture=fail, ?empty=1, ?skip=1 (skip the start screen),
+// ?conflict=1 (pretend another app owns Ctrl+Alt+Space)
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 
@@ -14,6 +15,7 @@ const status = {
   clickThrough: false, visible: true,
 };
 (window as any).__preview = { status, get stored() { return stored; } };
+(window as any).__emit = emit;
 const log: string[] = [];
 (window as any).__log = log;
 
@@ -35,8 +37,15 @@ const handler = async (cmd: string, args: any): Promise<unknown> => {
       case "set_capture_hidden":
         if (flags.get("capture") === "fail") throw "Windows refused";
         return { hidden: args.hidden, affinity: args.hidden ? 0x11 : 0 };
-      case "set_hotkeys":
-        return Object.values(args.hotkeys).includes("Ctrl+Alt+F1") ? ["Ctrl+Alt+F1: already registered"] : [];
+      case "set_hotkeys": {
+        const taken = new Set(["Ctrl+Alt+F1", ...(flags.get("conflict") ? ["Ctrl+Alt+Space"] : [])]);
+        return Object.entries(args.hotkeys as Record<string, string>)
+          .filter(([, keys]) => taken.has(keys))
+          .map(([action, keys]) => ({ action, keys, message: "HotKey already registered" }));
+      }
+      case "quit_app":
+        (window as any).__quit = true;
+        return null;
       case "set_taskbar_hidden":
         (window as any).__taskbarHidden = args.hidden;
         return null;

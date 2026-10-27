@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Mutex;
 
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
@@ -35,10 +36,18 @@ pub fn run_action<R: Runtime>(app: &AppHandle<R>, action: &str) {
     }
 }
 
-/// Replaces every hotkey. Returns one message per hotkey that could not be registered
-/// (bad format, or already taken by another program).
+/// A hotkey that couldn't be registered, so the page can say which action is affected.
+#[derive(Serialize)]
+pub struct HotkeyProblem {
+    action: String,
+    keys: String,
+    message: String,
+}
+
+/// Replaces every hotkey. Returns one entry per hotkey that could not be registered
+/// (bad format, used twice, or already taken by another program).
 #[tauri::command]
-pub fn set_hotkeys(app: AppHandle, hotkeys: HashMap<String, String>) -> Vec<String> {
+pub fn set_hotkeys(app: AppHandle, hotkeys: HashMap<String, String>) -> Vec<HotkeyProblem> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     let mut map = HashMap::new();
@@ -52,17 +61,17 @@ pub fn set_hotkeys(app: AppHandle, hotkeys: HashMap<String, String>) -> Vec<Stri
         match Shortcut::from_str(accel) {
             Ok(sc) => {
                 if map.contains_key(&sc.id()) {
-                    problems.push(format!("{accel} is used twice"));
+                    problems.push(HotkeyProblem { action, keys: accel.into(), message: "used for two actions".into() });
                     continue;
                 }
                 match gs.register(sc) {
                     Ok(()) => {
                         map.insert(sc.id(), action);
                     }
-                    Err(e) => problems.push(format!("{accel}: {e}")),
+                    Err(e) => problems.push(HotkeyProblem { action, keys: accel.into(), message: e.to_string() }),
                 }
             }
-            Err(e) => problems.push(format!("{accel}: {e}")),
+            Err(e) => problems.push(HotkeyProblem { action, keys: accel.into(), message: e.to_string() }),
         }
     }
 
