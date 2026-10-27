@@ -1035,7 +1035,8 @@ $("btn-tray").onclick = async () => {
 };
 $("rec-switch").onchange = (e) => {
   const on = (e.target as HTMLInputElement).checked;
-  data.settings = { ...S(), hidePrompterFromCapture: on, hideControlsFromCapture: on };
+  // Turning protection on also ends "Allow screenshots", otherwise the switch would stay off and look broken.
+  data.settings = { ...S(), hidePrompterFromCapture: on, hideControlsFromCapture: on, ...(on ? { allowScreenshots: false } : {}) };
   save();
   pushSettings();
   applyCapture();
