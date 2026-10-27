@@ -37,4 +37,9 @@ Core colours: night/ink (one navy family), ghost white, plus one accent (spectra
 - **Ghost flight:** on Continue, the logo drifts on a swaying arc to the credit badge and fades slightly mid-flight, so the credit feels like the ghost moved in rather than a banner being added. The badge then pulses twice so your eye follows where it landed. Reduced-motion users get no flight, only the badge highlight.
 - **Credit badge:** bottom right, in the always-visible footer of the Present panel, so the credit and the star link are reachable without scrolling and never cover the controls.
 - **Star icon:** used only on the two GitHub buttons, because starring is the action GitHub itself draws with a star.
+- **Discoverability:** nothing should depend on reading the README.
+  - **Status strip:** the Present panel lists anything unusual under the Start button (click-through on, prompter hidden, a hotkey taken by another app, a voice mode waiting for Start) with a one-click fix. It sits below Start so the main action never moves out of view.
+  - **One shortcuts sheet:** the same list, built from one source, opens from Ctrl+/ in both windows, a link under Start, and a ? on the prompter toolbar.
+  - **One-time tips:** the first time the prompter shows, its toolbar stays up with the edges outlined, and the main window explains where it goes when minimised. Each tip is dismissed once and remembered.
+  - **Exits say how to come back:** hiding the prompter, sending the window to the tray and turning on click-through all say which key or button undoes them. Quitting while the script scrolls asks first.
 - **Prompter overlay:** night background at 80%, ghost-white text, a light spectral guide and gold cues, so the overlay and the controls look like one product.

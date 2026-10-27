@@ -1,6 +1,6 @@
 [package]
 name = "ghost-in-the-script"
-version = "1.3.0"
+version = "1.4.0"
 description = "A teleprompter overlay that stays out of screen recordings"
 authors = ["Janitha Illankoon"]
 license = "MIT"
