@@ -30,6 +30,7 @@ pub fn run_action<R: Runtime>(app: &AppHandle<R>, action: &str) {
     match action {
         "toggle-controls" => crate::toggle_window(app, "main"),
         "toggle-prompter" => crate::toggle_window(app, "prompter"),
+        "screenshot" => crate::capture::allow_screenshot(app),
         other => {
             let _ = app.emit_to("prompter", "gp:hotkey", other.to_string());
         }

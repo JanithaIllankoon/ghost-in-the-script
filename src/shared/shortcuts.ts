@@ -17,7 +17,7 @@ export interface ShortcutSection {
 }
 
 export function shortcutSections(s: Settings, problems: HotkeyProblem[], include: { editor: boolean }): ShortcutSection[] {
-  const global: ShortcutRow[] = (Object.keys(ACTION_LABELS) as Action[]).map((a) => {
+  const global: ShortcutRow[] = (Object.keys(ACTION_LABELS) as Action[]).filter((a) => a !== "screenshot" || s.allowScreenshots).map((a) => {
     const p = problems.find((x) => x.action === a);
     return {
       keys: s.hotkeys[a] || "",

@@ -92,6 +92,8 @@ function set<K extends keyof Settings>(key: K, value: Settings[K]) {
   pushSettings();
   if (key === "hidePrompterFromCapture" || key === "hideControlsFromCapture") applyCapture();
   if (key === "hideFromTaskbar") applyTaskbar();
+  if (key === "allowScreenshots") applyHotkeys();
+  if (key === "screenshotSeconds") applyScreenshotSeconds();
   refreshFields();
 }
 
@@ -117,7 +119,7 @@ document.getElementById("app")!.innerHTML = `
       <div class="name">Ghost In The Script<small>A little less seen. A lot more confident.</small></div>
     </div>
     <div class="header-actions">
-      <span class="version">v1.5.0</span>
+      <span class="version">v1.5.1</span>
       <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
         <span id="theme-label">Light mode</span><span class="theme-track" aria-hidden="true"><span></span></span>
       </button>
@@ -541,6 +543,11 @@ const TABS: { id: string; label: string; fields: Field[] }[] = [
     fields: [
       { type: "toggle", key: "hidePrompterFromCapture", label: "Hide the prompter from recordings", hint: "Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing see through it." },
       { type: "toggle", key: "hideControlsFromCapture", label: "Hide this window from recordings" },
+      { type: "toggle", key: "allowScreenshots", label: "Allow screenshots with a hotkey", hint: () => {
+        const k = keysFor("screenshot");
+        return `Windows hides a window from screenshots and recordings together, so there's no way to allow only one. ${k ? `${k} makes` : "The hotkey (set it under Hotkeys) makes"} the prompter and this window capturable for a few seconds, then hides them again.`;
+      } },
+      { type: "range", key: "screenshotSeconds", label: "Screenshot window", min: 2, max: 30, step: 1, fmt: (v) => `${v} s`, hint: "How long they stay visible after the hotkey. Don't use it while recording." },
       { type: "toggle", key: "alwaysOnTop", label: "Keep the prompter on top" },
       { type: "toggle", key: "clickThrough", label: "Clicks pass through the prompter", hint: () => {
         const k = keysFor("toggle-click-through");
@@ -761,6 +768,7 @@ $("btn-reset").onclick = async () => {
   save();
   pushSettings();
   applyCapture();
+  applyScreenshotSeconds();
   applyTaskbar();
   applyHotkeys();
   toast("Settings reset");
@@ -1023,6 +1031,17 @@ listen("gp:prompter-hidden", () => {
   toast(`Prompter hidden. Use Show prompter${k ? ` or ${k}` : ""} to bring it back.`);
 });
 
+listen<number>("gp:screenshot", (e) => {
+  const box = $("rec-status");
+  box.className = "rec-status exposed";
+  $("rec-title").textContent = "Visible to screenshots";
+  $("rec-sub").textContent = `Hides again in ${e.payload} s. Recordings can see it too.`;
+});
+listen("gp:screenshot-end", () => {
+  refreshCaptureStatus();
+  toast("Hidden from screenshots and recordings again");
+});
+
 // The window's close button asks before quitting while a script is scrolling.
 listen("gp:close-requested", async () => {
   const running = status?.playing || (status?.counting ?? 0) > 0;
@@ -1258,7 +1277,18 @@ async function applyCapture() {
       invoke<{ hidden: boolean }>("set_capture_hidden", { label, hidden }).then((r) => r.hidden).catch(() => null),
     ),
   );
-  const [prompterHidden, controlsHidden] = results;
+  showCaptureStatus(results[0], results[1]);
+}
+
+/** Reads what Windows reports for both windows, for the status line (used after a screenshot window closes). */
+async function refreshCaptureStatus() {
+  const [p, c] = await Promise.all(
+    ["prompter", "main"].map((label) => invoke<{ hidden: boolean }>("capture_state", { label }).then((r) => r.hidden).catch(() => null)),
+  );
+  showCaptureStatus(p, c);
+}
+
+function showCaptureStatus(prompterHidden: boolean | null, controlsHidden: boolean | null) {
   const box = $("rec-status");
   if (prompterHidden === null || controlsHidden === null) {
     box.className = "rec-status exposed";
@@ -1285,8 +1315,15 @@ async function applyTaskbar() {
   await invoke("set_taskbar_hidden", { hidden: S().hideFromTaskbar }).catch((e) => toast(`Couldn't change the taskbar setting: ${e}`, true));
 }
 
+async function applyScreenshotSeconds() {
+  await invoke("set_screenshot_seconds", { seconds: S().screenshotSeconds }).catch(() => {});
+}
+
 async function applyHotkeys() {
-  hotkeyProblems = await invoke<HotkeyProblem[]>("set_hotkeys", { hotkeys: S().hotkeys }).catch((e) => [
+  // The screenshot hotkey only exists while the setting is on.
+  const hotkeys: Record<string, string> = { ...S().hotkeys };
+  if (!S().allowScreenshots) delete hotkeys.screenshot;
+  hotkeyProblems = await invoke<HotkeyProblem[]>("set_hotkeys", { hotkeys }).catch((e) => [
     { action: "", keys: "Hotkeys", message: String(e) },
   ]);
   refreshFields();
@@ -1355,6 +1392,7 @@ async function init() {
   pushSettings();
   pushScript(true);
   applyCapture();
+  applyScreenshotSeconds();
   applyTaskbar();
   applyHotkeys();
   loadDevices();

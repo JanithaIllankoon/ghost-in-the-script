@@ -22,7 +22,8 @@ export type Action =
   | "cycle-mode"
   | "toggle-click-through"
   | "toggle-prompter"
-  | "toggle-controls";
+  | "toggle-controls"
+  | "screenshot";
 
 export const ACTION_LABELS: Record<Action, string> = {
   "play-pause": "Play / pause",
@@ -35,6 +36,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   "toggle-click-through": "Click-through on/off",
   "toggle-prompter": "Show / hide prompter",
   "toggle-controls": "Show / hide controls",
+  screenshot: "Allow a screenshot",
 };
 
 export const DEFAULT_HOTKEYS: Record<Action, string> = {
@@ -48,6 +50,7 @@ export const DEFAULT_HOTKEYS: Record<Action, string> = {
   "toggle-click-through": "Ctrl+Alt+K",
   "toggle-prompter": "Ctrl+Alt+P",
   "toggle-controls": "Ctrl+Alt+O",
+  screenshot: "Ctrl+Alt+S",
 };
 
 export interface Settings {
@@ -101,6 +104,9 @@ export interface Settings {
   clickThrough: boolean;
   hidePrompterFromCapture: boolean;
   hideControlsFromCapture: boolean;
+  /** Adds a hotkey that makes both windows capturable for `screenshotSeconds`, then hides them again. */
+  allowScreenshots: boolean;
+  screenshotSeconds: number;
   /** Keep both windows off the taskbar so recordings can't show a taskbar button. */
   hideFromTaskbar: boolean;
 
@@ -156,6 +162,8 @@ export const DEFAULT_SETTINGS: Settings = {
   clickThrough: false,
   hidePrompterFromCapture: true,
   hideControlsFromCapture: true,
+  allowScreenshots: false,
+  screenshotSeconds: 5,
   hideFromTaskbar: true,
 
   seenPrompterTip: false,
