@@ -4,7 +4,8 @@
 //! (with voice features disabled) if the speech files are missing.
 
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
-use std::path::Path;
+use std::os::windows::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use libloading::os::windows::{Library, LOAD_WITH_ALTERED_SEARCH_PATH};
@@ -86,10 +87,17 @@ unsafe impl Sync for Model {}
 
 impl Model {
     pub fn load(api: &'static Vosk, path: &Path) -> Result<Model, String> {
-        let c = CString::new(path.to_string_lossy().as_bytes()).map_err(|e| e.to_string())?;
+        let plain = plain_windows_path(path);
+        if !plain.join("am").is_dir() || !plain.join("conf").is_dir() {
+            return Err(format!(
+                "{} isn't a Vosk speech model folder. It should contain am, conf and graph folders.",
+                plain.display()
+            ));
+        }
+        let c = CString::new(engine_path(&plain)).map_err(|e| e.to_string())?;
         let ptr = unsafe { (api.model_new)(c.as_ptr()) };
         if ptr.is_null() {
-            return Err(format!("Could not load speech model from {}", path.display()));
+            return Err(format!("Could not load the speech model from {}", plain.display()));
         }
         Ok(Model { api, ptr })
     }
@@ -106,6 +114,43 @@ impl Drop for Model {
     fn drop(&mut self) {
         unsafe { (self.api.model_free)(self.ptr) }
     }
+}
+
+/// Windows hands apps their own folder in "verbatim" form (`\\?\C:\...`, from canonicalize).
+/// The speech engine can't open files through that form, so turn it back into a normal path.
+pub fn plain_windows_path(path: &Path) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    if let Some(rest) = s.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest);
+    }
+    path.to_path_buf()
+}
+
+#[link(name = "kernel32")]
+extern "system" {
+    fn GetShortPathNameW(long: *const u16, short: *mut u16, len: u32) -> u32;
+}
+
+/// The engine reads paths as plain bytes in the system code page, so a folder name with
+/// non-English characters can fail. In that case use Windows' short (8.3) form, which is ASCII.
+fn engine_path(path: &Path) -> String {
+    let s = path.to_string_lossy().into_owned();
+    if s.is_ascii() {
+        return s;
+    }
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let mut buf = vec![0u16; 1024];
+    let n = unsafe { GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    if n > 0 && n < buf.len() {
+        let short = String::from_utf16_lossy(&buf[..n]);
+        if short.is_ascii() {
+            return short;
+        }
+    }
+    s
 }
 
 pub struct Recognizer {
@@ -160,5 +205,43 @@ unsafe fn read(f: RecResult, ptr: *mut c_void) -> String {
 impl Drop for Recognizer {
     fn drop(&mut self) {
         unsafe { (self.api.rec_free)(self.ptr) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bundled_vosk() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("resources").join("vosk")
+    }
+
+    #[test]
+    fn strips_verbatim_prefixes() {
+        assert_eq!(
+            plain_windows_path(Path::new(r"\\?\C:\Apps\Ghost In The Script")),
+            PathBuf::from(r"C:\Apps\Ghost In The Script")
+        );
+        assert_eq!(
+            plain_windows_path(Path::new(r"\\?\UNC\server\share\x")),
+            PathBuf::from(r"\\server\share\x")
+        );
+        assert_eq!(plain_windows_path(Path::new(r"C:\plain")), PathBuf::from(r"C:\plain"));
+    }
+
+    /// The reported bug: the installed app gets its folder as \\?\C:\... and the model failed to load.
+    #[test]
+    fn loads_bundled_model_from_verbatim_path() {
+        let dir = std::fs::canonicalize(bundled_vosk()).expect("run `npm run setup:speech` first");
+        assert!(dir.to_string_lossy().starts_with(r"\\?\"), "canonicalize should give a verbatim path");
+        let api = get(&dir.join("lib")).expect("speech engine loads");
+        Model::load(api, &dir.join("model")).expect("model loads from a verbatim path");
+    }
+
+    #[test]
+    fn explains_a_folder_that_is_not_a_model() {
+        let api = get(&bundled_vosk().join("lib")).expect("speech engine loads");
+        let err = Model::load(api, Path::new(env!("CARGO_MANIFEST_DIR"))).err().expect("should fail");
+        assert!(err.contains("isn't a Vosk speech model folder"), "{err}");
     }
 }
