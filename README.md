@@ -19,11 +19,11 @@
 
 You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right under your webcam so you can read it while looking at the camera. The recording only shows your slides.
 
-![The main window: scripts on the left, the editor in the middle, and the Present panel on the right](docs/v1.5.0/light.png)
+![The main window with scripts and navigation on the left, the editor in the middle and the Present panel on the right, with the prompter and its toolbar floating on top](docs/v1.5.1/light.png)
 
 ## What it does
 
-**Light and dark themes.** v1.5.0 added a clean workspace, and v1.5.1 reworks it into a sidebar with your scripts, an editor card, and a Present panel with scrolling-mode cards and speed and text size sliders. Use the switch at the bottom of the sidebar to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. The prompter has its own light/dark button on its toolbar (also under **Settings > Colours > Prompter theme**); it swaps the prompter's text, background, cue, highlight and guide colours. [See the v1.5.0 screenshots](docs/v1.5.0/dark.png).
+**Light and dark themes.** v1.5.0 added a clean workspace, and v1.5.1 reworks it into a sidebar with your scripts, an editor card, and a Present panel with scrolling-mode cards and speed and text size sliders. Use the switch at the bottom of the sidebar to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. The prompter has its own light/dark button on its toolbar (also under **Settings > Colours > Prompter theme**); it swaps the prompter's text, background, cue, highlight and guide colours.
 
 **Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The **Recording protection** switch in the Present panel is green while it's on and red when it's off. Tested with Panopto.
 
