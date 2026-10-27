@@ -4,11 +4,9 @@ The workspace uses a clean, quiet layout with a light theme by default and a nav
 
 ## Layout
 
-- A shared header holds the logo, version, and accessible light/dark switch.
-- The script library sits on a soft background, with a filled blue New script action and a quiet Import action.
-- The editor is an open writing surface with a compact toolbar, clear title, and word count footer.
-- The Present panel is wider, with more space between sections. Its controls scroll independently while the footer stays visible.
-- Recording visibility is plain status text with a small indicator. One divider separates it from the Recording settings action below. Other notices also put their actions underneath the message.
+- A left sidebar holds the logo, navigation (Scripts, Settings, Hotkeys, Appearance, About), New script and Import file, the searchable script list, and a footer with the author credit, version and the light/dark switch.
+- The editor is a rounded card with the script title and word count in its header, Duplicate, Save and Delete beside them, a formatting toolbar, and a footer with the word count and save state.
+- The Present panel on the right starts with the Start prompting button and its hotkey, then playback progress, three scrolling-mode cards, speed and text size sliders, a sentence-by-sentence Preview & test, Show prompter and Minimise to tray, and a Recording protection switch with its status line. It scrolls on its own.
 - Settings and shortcut sheets remain available on demand.
 
 ## Themes and typography

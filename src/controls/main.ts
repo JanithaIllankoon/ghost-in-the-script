@@ -17,7 +17,6 @@ import {
   DATA_VERSION,
   DEFAULT_HOTKEYS,
   DEFAULT_SETTINGS,
-  MODE_HINTS,
   MODE_LABELS,
   normalizeData,
   uid,
@@ -108,52 +107,96 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>';
 const PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4.5" height="15" rx="1.2"/><rect x="13.5" y="4.5" width="4.5" height="15" rx="1.2"/></svg>';
 
+// Line icons for the layout. They inherit the text colour.
+const icon = (paths: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+const ICONS = {
+  scripts: icon('<path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M9.5 12h5M9.5 15.5h5"/>'),
+  settings: icon('<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>'),
+  hotkeys: icon('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M10.5 10h.01M14 10h.01M17 10h.01M8 14h8"/>'),
+  appearance: icon('<path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.3-1.1-1.6-1.1-2.7 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4C21 6.7 17 3 12 3z"/><path d="M7.5 11h.01M10 7.5h.01M14.5 7.5h.01"/>'),
+  about: icon('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/>'),
+  plus: icon('<path d="M12 5v14M5 12h14"/>'),
+  upload: icon('<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4.5 15v4.5h15V15"/>'),
+  search: icon('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
+  moon: icon('<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>'),
+  manual: icon('<path d="M5 7h14M5 12h14M5 17h9"/>'),
+  voice: icon('<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>'),
+  follow: icon('<path d="M4 12h.01M7.5 9v6M11 5.5v13M14.5 8v8M18 10.5v3M21 12h.01"/>'),
+  check: icon('<path d="m6 12.5 4 4 8-9"/>'),
+  eyeOff: icon('<path d="M3 3l18 18"/><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4 9.5 6a14 14 0 0 1-2.9 3.6M6.4 7.6A14 14 0 0 0 2.5 12c1 2 4.5 6 9.5 6 1.4 0 2.6-.3 3.7-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
+  pin: icon('<path d="M9 4h6l-1 5 3 3v1.5H7V12l3-3z"/><path d="M12 13.5V20"/>'),
+  tray: icon('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 14h5l1 2h5l1-2h5"/>'),
+  pencil: icon('<path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 2.8 0l.2.2a2 2 0 0 1 0 2.8L8 19z"/><path d="M14.5 6.5l3 3"/>'),
+  prev: icon('<path d="m14.5 6-6 6 6 6"/>'),
+  next: icon('<path d="m9.5 6 6 6-6 6"/>'),
+};
+
+/** Short mode descriptions for the three cards; the longer ones live in MODE_HINTS. */
+const MODE_SHORT: Record<ScrollMode, string> = {
+  manual: "Scrolls at a steady pace.",
+  voice: "Scrolls while you talk. Stops when you pause.",
+  follow: "Keeps the line you're reading on the guide.",
+};
+
 // ---------- Layout ----------
 document.getElementById("app")!.innerHTML = `
   ${splashHtml()}
 
-  <header class="app-header">
-    <div class="brand">
-      <img src="${logoUrl}" alt="Ghost In The Script logo" />
-      <div class="name">Ghost In The Script<small>A little less seen. A lot more confident.</small></div>
-    </div>
-    <div class="header-actions">
-      <span class="version">v1.5.1</span>
-      <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
-        <span id="theme-label">Light mode</span><span class="theme-track" aria-hidden="true"><span></span></span>
-      </button>
-    </div>
-  </header>
   <div class="shell">
     <aside class="scripts" aria-label="Scripts">
-      <div class="section-heading"><span class="eyebrow">WORKSPACE</span><h1>Scripts</h1></div>
+      <div class="brand">
+        <img src="${logoUrl}" alt="Ghost In The Script logo" />
+        <div class="name">Ghost In The Script<small>A little less seen. A lot more confident.</small></div>
+      </div>
+      <nav class="nav" aria-label="Main">
+        <button aria-current="page" id="nav-scripts">${ICONS.scripts}<span>Scripts</span></button>
+        <button id="btn-settings">${ICONS.settings}<span>Settings</span></button>
+        <button id="nav-hotkeys">${ICONS.hotkeys}<span>Hotkeys</span></button>
+        <button id="nav-appearance">${ICONS.appearance}<span>Appearance</span></button>
+        <button id="nav-about">${ICONS.about}<span>About</span></button>
+      </nav>
       <div class="scripts-actions">
-        <button class="btn primary small" id="btn-new">New script</button>
-        <button class="btn small" id="btn-import">Import file</button>
+        <button class="btn primary" id="btn-new">${ICONS.plus}<span>New script</span></button>
+        <button class="btn quiet" id="btn-import">${ICONS.upload}<span>Import file</span></button>
       </div>
+      <div class="list-head" id="list-head">SCRIPTS</div>
       <div class="search-wrap">
-        <input class="search" id="search" type="search" placeholder="Search scripts" aria-label="Search scripts" />
+        ${ICONS.search}
+        <input class="search" id="search" type="search" placeholder="Search scripts..." aria-label="Search scripts" />
       </div>
-      <div class="list-head" id="list-head">Your scripts</div>
       <ul class="script-list" id="list"></ul>
       <div class="list-empty" id="list-empty" hidden>
         <p id="list-empty-text"></p>
         <button class="btn small" id="btn-clear-search">Clear search</button>
       </div>
       <input type="file" id="file" accept=".txt,.md,.markdown,.docx,.rtf" multiple hidden />
+      <div class="side-foot">
+        ${creditHtml()}
+        <div class="side-row">
+          <span class="version">v1.5.1</span>
+          <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
+            ${ICONS.moon}<span id="theme-label">Light mode</span><span class="theme-track" aria-hidden="true"><span></span></span>
+          </button>
+        </div>
+      </div>
     </aside>
 
     <main class="write" aria-label="Script editor">
-      <div class="editor-heading"><span class="eyebrow">SCRIPT EDITOR</span><span class="editor-note">Your next great take starts here.</span></div>
       <div class="banner" id="save-error" role="alert" hidden>
         <span id="save-error-text"></span>
         <button class="btn small" id="btn-retry-save">Try again</button>
       </div>
       <div class="write-head">
-        <input class="title-input" id="title" placeholder="Name this script" aria-label="Script name" />
-        <button class="btn quiet small" id="btn-dup">Duplicate</button>
-        <button class="btn quiet small" id="btn-export">Save as .txt</button>
-        <button class="btn quiet small danger" id="btn-del">Delete</button>
+        <span class="file-tile" aria-hidden="true">${ICONS.scripts}</span>
+        <div class="write-title">
+          <input class="title-input" id="title" placeholder="Name this script" aria-label="Script name" />
+          <span class="write-meta"><b id="wc">0</b> words <i aria-hidden="true">&bull;</i> About <b id="dur">0:00</b> at a normal speaking pace</span>
+        </div>
+        <div class="write-actions">
+          <button class="btn small" id="btn-dup">Duplicate</button>
+          <button class="btn small" id="btn-export">Save as .txt</button>
+          <button class="btn small danger" id="btn-del">Delete</button>
+        </div>
       </div>
       <div class="format-bar" role="toolbar" aria-label="Formatting">
         <button class="btn" data-wrap="**" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
@@ -184,64 +227,78 @@ document.getElementById("app")!.innerHTML = `
         <div class="drop-hint" id="drop" hidden>Drop to import</div>
       </div>
       <div class="write-foot">
-        <span><b id="wc">0</b> words</span>
-        <span>About <b id="dur">0:00</b> at a normal speaking pace</span>
+        <span><b id="wc2">0</b> words</span>
+        <span>About <b id="dur2">0:00</b> at a normal speaking pace</span>
         <span class="saved" id="saved"></span>
       </div>
     </main>
 
     <aside class="present" aria-label="Present">
       <div class="present-body">
-      <div class="section-heading"><span class="eyebrow">READY WHEN YOU ARE</span><h2>Present</h2></div>
-      <div class="recording-section">
-      <div class="rec-status unknown" id="rec-status" role="status">
-        <span class="mark" aria-hidden="true"></span>
-        <span class="rec-text"><b id="rec-title">Checking recording visibility…</b><span id="rec-sub"></span></span>
-      </div>
-      <button class="btn quiet small" id="btn-recording">Recording settings <span aria-hidden="true">↗</span></button>
-      </div>
-      <button class="start" id="start">${PLAY}<span id="start-label">Start prompting</span></button>
-      <p class="start-hint"><span id="start-hint"></span><br/><button class="link" id="btn-shortcuts">Keyboard shortcuts and gestures (Ctrl+/)</button></p>
+        <button class="start" id="start"><span class="start-main" id="start-main">${PLAY}<span>Start prompting</span></span><kbd class="start-keys" id="start-keys" hidden></kbd></button>
+        <p class="start-hint"><span id="start-hint"></span> <button class="link" id="btn-shortcuts">Keyboard shortcuts and gestures (Ctrl+/)</button></p>
 
-      <div class="notices" id="notices" aria-live="polite"></div>
+        <div class="notices" id="notices" aria-live="polite"></div>
 
-      <div class="progress">
-        <button class="bar" id="bar" aria-label="Jump to a point in the script" title="Click to jump to that point in the script"><span class="fill" id="fill"></span></button>
-        <div class="meta"><span id="elapsed">0:00</span><span id="wpm"></span><span id="remaining">-0:00</span></div>
-      </div>
-      <div class="nav-row">
-        <button class="btn small" id="t-rewind">To start</button>
-        <button class="btn small" id="t-back">Line up</button>
-        <button class="btn small" id="t-fwd">Line down</button>
-      </div>
+        <div class="progress">
+          <button class="bar" id="bar" aria-label="Jump to a point in the script" title="Click to jump to that point in the script"><span class="fill" id="fill"></span></button>
+          <div class="meta"><span id="elapsed">0:00</span><span id="wpm"></span><span id="remaining">-0:00</span></div>
+        </div>
+        <div class="nav-row">
+          <button class="btn small" id="t-rewind">To start</button>
+          <button class="btn small" id="t-back">Line up</button>
+          <button class="btn small" id="t-fwd">Line down</button>
+        </div>
 
-      <div>
-        <h2 class="group-title" id="modes-title">How it scrolls</h2>
-        <fieldset class="modes" id="modes" aria-labelledby="modes-title">
-          ${(["manual", "voice", "follow"] as ScrollMode[]).map((m) => `
-            <label class="mode">
-              <input type="radio" name="mode" value="${m}" />
-              <span class="radio" aria-hidden="true"></span>
-              <span><b>${MODE_LABELS[m]}</b><small>${MODE_HINTS[m]}</small></span>
-            </label>`).join("")}
-        </fieldset>
-      </div>
+        <section>
+          <h2 class="group-title" id="modes-title">Scrolling mode</h2>
+          <fieldset class="modes" id="modes" aria-labelledby="modes-title">
+            ${(["manual", "voice", "follow"] as ScrollMode[]).map((m) => `
+              <label class="mode">
+                <input type="radio" name="mode" value="${m}" />
+                <span class="tick" aria-hidden="true">${ICONS.check}</span>
+                <span class="mode-icon" aria-hidden="true">${ICONS[m]}</span>
+                <b>${MODE_LABELS[m]}</b>
+                <small>${MODE_SHORT[m]}</small>
+              </label>`).join("")}
+          </fieldset>
+        </section>
 
-      <div class="voice-box" id="voice-box" hidden>
-        <div class="meter" aria-hidden="true" title="Your microphone level. The gold mark is how loud you need to be for it to count as talking."><div class="fill" id="p-meter"></div><div class="mark" id="p-mark"></div></div>
-        <div class="heard" id="heard" role="status"></div>
-        <button class="link" id="btn-sensitivity">Adjust sensitivity</button>
-      </div>
+        <div class="voice-box" id="voice-box" hidden>
+          <div class="meter" aria-hidden="true" title="Your microphone level. The gold mark is how loud you need to be for it to count as talking."><div class="fill" id="p-meter"></div><div class="mark" id="p-mark"></div></div>
+          <div class="heard" id="heard" role="status"></div>
+          <button class="link" id="btn-sensitivity">Adjust sensitivity</button>
+        </div>
 
-      <div class="quick" id="quick"></div>
-      </div>
+        <div class="quick" id="quick"></div>
 
-      <div class="present-bottom">
-      <div class="present-foot">
-        <button class="btn" id="btn-prompter">Show prompter</button>
-        <button class="btn" id="btn-settings">All settings</button>
-      </div>
-      ${creditHtml()}
+        <section>
+          <h2 class="group-title">Preview &amp; test</h2>
+          <div class="preview">
+            <button class="pv-nav" id="pv-prev" aria-label="Previous line">${ICONS.prev}</button>
+            <p class="pv-text" id="pv-text"></p>
+            <button class="pv-nav" id="pv-next" aria-label="Next line">${ICONS.next}</button>
+            <button class="pv-edit" id="pv-edit" title="Edit this script" aria-label="Edit this script">${ICONS.pencil}</button>
+          </div>
+        </section>
+
+        <div class="panel-actions">
+          <button class="btn primary" id="btn-prompter">${ICONS.pin}<span id="btn-prompter-label">Show prompter</span></button>
+          <button class="btn" id="btn-tray">${ICONS.tray}<span>Minimise to tray</span></button>
+        </div>
+
+        <section class="rec-card">
+          <div class="rec-head">
+            <span class="rec-icon" aria-hidden="true">${ICONS.eyeOff}</span>
+            <b>Recording protection</b>
+            <span class="switch"><input type="checkbox" role="switch" id="rec-switch" aria-label="Hide the prompter and this window from recordings" /><span></span></span>
+          </div>
+          <div class="rec-status unknown" id="rec-status" role="status">
+            <span class="mark" aria-hidden="true"></span>
+            <span class="rec-text"><b id="rec-title">Checking recording visibility…</b><span id="rec-sub"></span></span>
+          </div>
+          <button class="link" id="btn-recording">Recording settings <span aria-hidden="true">↗</span></button>
+        </section>
       </div>
     </aside>
   </div>
@@ -930,6 +987,7 @@ function buildPresent() {
     const s = S();
     document.querySelectorAll<HTMLInputElement>('#modes input[name="mode"]').forEach((r) => (r.checked = r.value === s.mode));
     $("voice-box").hidden = s.mode === "manual";
+    $<HTMLInputElement>("rec-switch").checked = s.hidePrompterFromCapture && s.hideControlsFromCapture && !s.allowScreenshots;
     $("p-mark").style.left = `${threshold() * 100}%`;
     renderStatus();
   });
@@ -955,6 +1013,31 @@ $("bar").onkeydown = (e) => {
   e.preventDefault();
 };
 $("btn-recording").onclick = () => openSettings("window");
+$("nav-hotkeys").onclick = () => openSettings("hotkeys");
+$("nav-appearance").onclick = () => openSettings("look");
+$("nav-scripts").onclick = () => $("search").focus();
+$("nav-about").onclick = () => {
+  const credit = $("credit");
+  credit.classList.remove("highlight");
+  void credit.offsetWidth;
+  credit.classList.add("highlight");
+  toast("Made by Janitha Illankoon. A star on GitHub helps other presenters find it.");
+};
+$("btn-tray").onclick = async () => {
+  const w = await Window.getByLabel("main");
+  if (!w) return;
+  const k = keysFor("toggle-controls");
+  toast(`Minimised to the tray${k ? `. ${k} brings it back` : ""}.`);
+  await w.hide();
+};
+$("rec-switch").onchange = (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  data.settings = { ...S(), hidePrompterFromCapture: on, hideControlsFromCapture: on };
+  save();
+  pushSettings();
+  applyCapture();
+  refreshFields();
+};
 
 let status: PrompterStatus | null = null;
 function fmt(sec: number) {
@@ -971,25 +1054,29 @@ function renderStatus() {
   start.dataset.playing = String(hasText && !!st && (st.playing || st.counting > 0));
   const hk = S().hotkeys["play-pause"];
   const hkBroken = hotkeyProblems.some((p) => p.action === "play-pause");
+  const keys = $("start-keys");
+  keys.hidden = !hasText || !hk || hkBroken;
+  keys.textContent = hk ? hk.replace(/\+/g, " + ") : "";
   $("start-hint").textContent = !hasText
-    ? "Write or import a script first"
-    : !hk ? "No play/pause hotkey set"
-    : hkBroken ? `${hk.replace(/\+/g, " + ")} isn't available right now`
-    : `or press ${hk.replace(/\+/g, " + ")} in any app`;
+    ? "Write or import a script first."
+    : !hk ? "No play/pause hotkey set."
+    : hkBroken ? `${hk.replace(/\+/g, " + ")} isn't available right now.`
+    : "";
   renderNotices();
-  if (!hasText) start.innerHTML = `${PLAY}<span>Start prompting</span>`;
+  const startMain = $("start-main");
+  if (!hasText) startMain.innerHTML = `${PLAY}<span>Start prompting</span>`;
   if (!st) return;
   if (hasText) {
     const running = st.playing || st.counting > 0;
     const label = st.counting ? `Starting in ${st.counting}…` : st.playing ? "Pause" : st.progress > 0.001 ? "Resume" : "Start prompting";
-    start.innerHTML = `${running ? PAUSE : PLAY}<span>${label}</span>`;
+    startMain.innerHTML = `${running ? PAUSE : PLAY}<span>${label}</span>`;
   }
   $("fill").style.width = `${st.progress * 100}%`;
   $("bar").setAttribute("aria-valuetext", `${Math.round(st.progress * 100)}% through`);
   $("elapsed").textContent = fmt(st.elapsed);
   $("remaining").textContent = `-${fmt(st.remaining)}`;
   $("wpm").textContent = st.wpm > 0 ? `about ${st.wpm} words/min` : "";
-  $("btn-prompter").textContent = st.visible ? "Hide prompter" : "Show prompter";
+  $("btn-prompter-label").textContent = st.visible ? "Hide prompter" : "Show prompter";
 
   const box = $("voice-box");
   const heard = $("heard");
@@ -1083,7 +1170,11 @@ function renderList() {
     const li = el("li");
     const b = el("button", "script-item");
     b.setAttribute("aria-current", String(s.id === data.activeScriptId));
-    b.append(el("span", "t", s.title.trim() || "Untitled script"), el("span", "m", `${countWords(s.body)} words, ${relTime(s.updatedAt)}`));
+    const tile = el("span", "si-icon");
+    tile.innerHTML = ICONS.scripts;
+    const text = el("span", "si-text");
+    text.append(el("span", "t", s.title.trim() || "Untitled script"), el("span", "m", `${countWords(s.body)} words \u2022 ${relTime(s.updatedAt)}`));
+    b.append(tile, text);
     b.onclick = () => selectScript(s.id);
     li.appendChild(b);
     list.appendChild(li);
@@ -1103,10 +1194,33 @@ function loadEditor() {
 
 function updateStats() {
   const wc = countWords(bodyEl.value);
-  $("wc").textContent = String(wc);
   const secs = Math.round((wc / 150) * 60);
-  $("dur").textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  const dur = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  for (const id of ["wc", "wc2"]) $(id).textContent = String(wc);
+  for (const id of ["dur", "dur2"]) $(id).textContent = dur;
+  renderPreview();
 }
+
+// ---------- Preview & test: step through the script a sentence at a time ----------
+let previewIndex = 0;
+function previewLines(): string[] {
+  return bodyEl.value
+    .replace(/\{[^}]*\}|\[[^\]]*\]|[*_=]{2,}|(?<![\w*])\*|\*(?![\w*])/g, "")
+    .split(/\n+/)
+    .flatMap((p) => p.split(/(?<=[.!?])\s+/))
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+function renderPreview() {
+  const lines = previewLines();
+  previewIndex = Math.min(previewIndex, Math.max(0, lines.length - 1));
+  $("pv-text").textContent = lines[previewIndex] ?? "Your script will show here.";
+  $<HTMLButtonElement>("pv-prev").disabled = previewIndex <= 0;
+  $<HTMLButtonElement>("pv-next").disabled = previewIndex >= lines.length - 1;
+}
+$("pv-prev").onclick = () => { previewIndex = Math.max(0, previewIndex - 1); renderPreview(); };
+$("pv-next").onclick = () => { previewIndex += 1; renderPreview(); };
+$("pv-edit").onclick = () => bodyEl.focus();
 
 function selectScript(id: string) {
   data.activeScriptId = id;
