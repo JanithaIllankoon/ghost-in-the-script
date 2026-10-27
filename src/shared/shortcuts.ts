@@ -46,7 +46,7 @@ export function shortcutSections(s: Settings, problems: HotkeyProblem[], include
       title: "Mouse on the prompter",
       rows: [
         { keys: "Hover", label: "Shows the toolbar", isMouse: true },
-        { keys: "Drag the toolbar", label: "Moves the prompter (or hold Alt and drag anywhere)", isMouse: true },
+        { keys: "Drag the dotted handle", label: "Moves the prompter (or hold Alt and drag anywhere)", isMouse: true },
         { keys: "Drag an edge", label: "Resizes it", isMouse: true },
         { keys: "Mouse wheel", label: "Scrolls the script by hand", isMouse: true },
         { keys: "Double-click a word", label: "Jumps there", isMouse: true },

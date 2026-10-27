@@ -61,7 +61,7 @@ document.getElementById("app")!.innerHTML = `
     <div id="toast"></div>
     <div id="ct-chip" hidden></div>
     <div id="tip" role="dialog" aria-label="How to move the prompter" hidden>
-      <p><b>Drag this bar</b> to move the prompter. <b>Drag any edge</b> to resize it.</p>
+      <p><b>Drag the dotted handle</b> under the toolbar to move the prompter. <b>Drag any edge</b> to resize it.</p>
       <p>Press <b>?</b> on the bar for every shortcut. Hold Alt and drag to move it from anywhere.</p>
       <button id="tip-ok">Got it</button>
     </div>
@@ -74,7 +74,6 @@ document.getElementById("app")!.innerHTML = `
     <button class="side-arrow left" id="side-prev" title="Back one line" aria-label="Back one line">${ICON.chevL}</button>
     <button class="side-arrow right" id="side-next" title="Forward one line" aria-label="Forward one line">${ICON.chevR}</button>
     <div id="toolbar" data-tauri-drag-region>
-      <span class="grip" data-tauri-drag-region title="Drag to move the prompter">⋮⋮</span>
       <div class="tb-item" data-tauri-drag-region>
         <button id="tb-play" class="round" title="Play or pause (Space)" aria-label="Play or pause">${ICON.play}</button>
         <span class="tb-label" id="tb-play-label" data-tauri-drag-region>Play</span>
@@ -128,6 +127,7 @@ document.getElementById("app")!.innerHTML = `
         <button id="tb-hide" title="Hide the prompter" aria-label="Hide the prompter">${ICON.close}</button>
         <span class="tb-label" data-tauri-drag-region>Close</span>
       </div>
+      <div id="drag-handle" data-tauri-drag-region title="Drag to move the prompter" aria-label="Drag to move the prompter"></div>
     </div>
     ${["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((d) => `<div class="grip-r ${d}" data-dir="${d}"></div>`).join("")}
   </div>`;
@@ -805,6 +805,8 @@ function maybeShowTip() {
   $("tip").hidden = false;
   root.classList.add("teaching");
   toolbar.classList.add("on");
+  // Point the tip at the drag handle, wherever the toolbar's height puts it.
+  $("tip").style.top = `${$("drag-handle").getBoundingClientRect().bottom + 12}px`;
 }
 function dismissTip() {
   if (!tipShowing) return;

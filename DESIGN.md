@@ -11,7 +11,7 @@ The workspace uses a clean, quiet layout with a light theme by default and a nav
 
 ## Prompter toolbar
 
-The prompter's hover toolbar uses icons over small labels: Play, Previous and Next line, Speed with minus and plus, a Scrolling mode menu, a Click-through switch, a light/dark Theme button, Controls, Help and Close. Previous and next arrows also float at the sides while the toolbar shows, and the timer reads elapsed / total. Narrower prompters drop the labels first, then less-used buttons, so the toolbar always fits. The Theme button (and Settings > Colours > Prompter theme) swaps the prompter's text, background, cue, highlight and guide colours between a navy dark palette and a light one.
+The prompter's hover toolbar uses icons over small labels: Play, Previous and Next line, Speed with minus and plus, a Scrolling mode menu, a Click-through switch, a light/dark Theme button, Controls, Help and Close. Previous and next arrows also float at the sides while the toolbar shows, and the timer reads elapsed / total. A dotted handle hangs under the toolbar as the place to grab to move the prompter, and the first-run tip points at it. Narrower prompters drop the labels first, then less-used buttons, so the toolbar always fits. The Theme button (and Settings > Colours > Prompter theme) swaps the prompter's text, background, cue, highlight and guide colours between a navy dark palette and a light one.
 
 ## Themes and typography
 

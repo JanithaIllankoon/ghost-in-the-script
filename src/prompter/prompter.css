@@ -258,7 +258,43 @@ html, body {
   z-index: 10;
 }
 #toolbar.on { opacity: 1; pointer-events: auto; }
-#toolbar .grip { color: var(--tb-dim); padding: 0 6px 0 0; font-size: 14px; letter-spacing: -2px; }
+
+/* Dotted handle under the toolbar: the place to grab to move the prompter. */
+#drag-handle {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: min(520px, 46%);
+  min-width: 110px;
+  height: 24px;
+  margin: -1px 0 0 0;
+  transform: translateX(-50%);
+  border-radius: 0 0 18px 18px;
+  background-color: var(--tb-bg);
+  background-image: radial-gradient(circle, var(--tb-dim) 0.9px, transparent 1.4px);
+  background-size: 8px 6px;
+  background-position: center 2px;
+  border: 1px solid var(--tb-line);
+  border-top: 0;
+  box-shadow: 0 10px 20px var(--tb-shadow);
+  cursor: grab;
+}
+#drag-handle:active { cursor: grabbing; }
+#drag-handle::before, #drag-handle::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+#drag-handle::before { left: -16px; background: radial-gradient(circle at 0 100%, transparent 15px, var(--tb-bg) 16px); }
+#drag-handle::after { right: -16px; background: radial-gradient(circle at 100% 100%, transparent 15px, var(--tb-bg) 16px); }
+#root.teaching #drag-handle { border-color: var(--tb-accent); animation: handle-pulse 1.4s ease-in-out infinite; }
+@keyframes handle-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tb-accent) 55%, transparent); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
 #toolbar .tb-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 5px; }
 #toolbar .tb-label { color: var(--tb-dim); font: 500 11px/1.1 "Segoe UI Variable Text", "Segoe UI", sans-serif; }
 #toolbar .sep { width: 1px; height: 38px; background: var(--tb-line); margin: 0 5px; }
@@ -346,7 +382,7 @@ svg.stroke { fill: none !important; stroke: currentColor; stroke-width: 1.8; str
   .side-arrow { display: none; }
 }
 @container root (max-width: 700px) {
-  #toolbar .sep, #toolbar .grip { display: none; }
+  #toolbar .sep { display: none; }
   #toolbar .tb-item:has(#tb-help), #toolbar .tb-item:has(#tb-prev), #toolbar .tb-item:has(#tb-next) { display: none; }
 }
 @container root (max-width: 460px) {
