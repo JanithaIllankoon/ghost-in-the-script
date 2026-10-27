@@ -23,13 +23,13 @@ You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right 
 
 ## What it does
 
-**Light and dark themes.** v1.5.0 adds a clean workspace with a roomier Present panel, plain status lines, and hover and click feedback. Use the switch in the top-right corner to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. [See dark mode](docs/v1.5.0/dark.png).
+**Light and dark themes.** v1.5.0 added a clean workspace, and v1.5.1 reworks it into a sidebar with your scripts, an editor card, and a Present panel with scrolling-mode cards and speed and text size sliders. Use the switch at the bottom of the sidebar to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. The prompter has its own light/dark button on its toolbar (also under **Settings > Colours > Prompter theme**); it swaps the prompter's text, background, cue, highlight and guide colours. [See the v1.5.0 screenshots](docs/v1.5.0/dark.png).
 
-**Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The status line at the top of the Present panel reads the setting back from Windows, so a green dot means it's really on. Tested with Panopto.
+**Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The **Recording protection** switch in the Present panel is green while it's on and red when it's off. Tested with Panopto.
 
-**Screenshots on request.** Because the hiding covers screenshots too, v1.5.1 adds an **Allow screenshots** switch under **All settings > Window**. While it's on, the prompter and the main window show up in Print Screen and Snipping Tool (and in recordings, so turn it off before you record). **Ctrl+Alt+S** flips it from any app.
+**Screenshots on request.** Because the hiding covers screenshots too, v1.5.1 adds an **Allow screenshots** switch under **Settings > Window**. While it's on, the prompter and the main window show up in Print Screen and Snipping Tool (and in recordings, so turn it off before you record). **Ctrl+Alt+S** flips it from any app.
 
-**Off the taskbar too.** A full-screen recording also captures your taskbar, so by default the app keeps no taskbar button there. Open it from the ghost in the tray, near the clock, or with **Ctrl+Alt+O**. Minimising the main window sends it to the tray. You can turn this off under **All settings > Window**.
+**Off the taskbar too.** A full-screen recording also captures your taskbar, so by default the app keeps no taskbar button there. Open it from the ghost in the tray, near the clock, or with **Ctrl+Alt+O**. Minimising the main window sends it to the tray. You can turn this off under **Settings > Window**.
 
 **Three ways to scroll.**
 
@@ -63,7 +63,7 @@ If you used an earlier test build called "Ghost Prompter", uninstall it from **S
 1. Write or paste your script, or import a file.
 2. Pick how it should scroll.
 3. Press **Start prompting**, or **Ctrl + Alt + Space** from any app.
-4. Drag the prompter under your webcam with the toolbar that appears when you hover over it. Resize it from any edge.
+4. Drag the prompter under your webcam by the dotted handle under the toolbar that appears when you hover over it. Resize it from any edge.
 
 ### Hotkeys
 
@@ -78,7 +78,7 @@ If you used an earlier test build called "Ghost Prompter", uninstall it from **S
 | Show / hide the prompter | Ctrl+Alt+P |
 | Show / hide the main window | Ctrl+Alt+O |
 
-Change them under **All settings > Hotkeys**. If another app already uses one, the main window tells you and offers to change it.
+Change them under **Settings > Hotkeys**. If another app already uses one, the main window tells you and offers to change it.
 
 **Every shortcut in one place:** press **Ctrl+/** in either window, select **Keyboard shortcuts and gestures** under the Start button, or press **?** on the prompter's toolbar.
 
@@ -99,7 +99,7 @@ blank line             new paragraph
 
 ### Other languages
 
-The built-in speech model is English. For another language, or better accuracy, download a model from the [Vosk model list](https://alphacephei.com/vosk/models), unzip it, and paste the folder path under **All settings > Voice > Speech model folder**.
+The built-in speech model is English. For another language, or better accuracy, download a model from the [Vosk model list](https://alphacephei.com/vosk/models), unzip it, and paste the folder path under **Settings > Voice > Speech model folder**.
 
 ## Limits
 
