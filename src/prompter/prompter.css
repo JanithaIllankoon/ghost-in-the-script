@@ -1,0 +1,282 @@
+:root {
+  --font: "Segoe UI";
+  --size: 44px;
+  --weight: 600;
+  --lh: 1.45;
+  --ls: 0px;
+  --ws: 0px;
+  --ps: 0.9em;
+  --align: left;
+  --text: #f4f5ff;
+  --cue: #e9b75f;
+  --hl: #2f6fe8;
+  --guide: #7fa8ff;
+  --read: 0.45;
+  --margin: 6%;
+  --bg: rgba(5, 13, 46, 0.78);
+  --pad-top: 80px;
+  --pad-bottom: 260px;
+  --guide-y: 100px;
+  --line-px: 64px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+#root.hovered:not(.click-through) { box-shadow: inset 0 0 0 1px rgba(127, 168, 255, 0.45); }
+
+#stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+#stage.fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 82%, transparent 100%);
+}
+
+#content {
+  position: relative;
+  will-change: transform;
+  padding: var(--pad-top) var(--margin) var(--pad-bottom);
+  color: var(--text);
+  font-family: var(--font), "Segoe UI", sans-serif;
+  font-size: var(--size);
+  font-weight: var(--weight);
+  line-height: var(--lh);
+  letter-spacing: var(--ls);
+  word-spacing: var(--ws);
+  text-align: var(--align);
+  overflow-wrap: break-word;
+}
+#content.upper { text-transform: uppercase; }
+#content.outline { text-shadow: 0 0 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.7); }
+
+.para { margin: 0 0 var(--ps); }
+.para:last-child { margin-bottom: 0; }
+.w { transition: opacity 0.25s ease; }
+.w.read { opacity: var(--read); }
+.b { font-weight: 800; }
+.i { font-style: italic; }
+.u { text-decoration: underline; text-underline-offset: 0.12em; }
+.hl { background: color-mix(in srgb, var(--hl) 55%, transparent); border-radius: 0.12em; }
+.cue {
+  color: var(--cue);
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  vertical-align: 0.15em;
+  padding: 0 0.15em;
+}
+
+/* Reading guide */
+#guide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--guide-y);
+  height: 0;
+  pointer-events: none;
+}
+#guide.hidden { display: none; }
+#guide .line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  background: var(--guide);
+  opacity: 0.85;
+}
+#guide .band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--line-px) / -2);
+  height: var(--line-px);
+  background: color-mix(in srgb, var(--guide) 16%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--guide) 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--guide) 55%, transparent);
+}
+#guide .arrow {
+  position: absolute;
+  top: -14px;
+  width: 0;
+  height: 0;
+  border-top: 14px solid transparent;
+  border-bottom: 14px solid transparent;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
+}
+#guide .arrow.left { left: 4px; border-left: 18px solid var(--guide); }
+#guide .arrow.right { right: 4px; border-right: 18px solid var(--guide); }
+#guide > * { display: none; }
+#guide.style-line .line { display: block; }
+#guide.style-band .band { display: block; }
+#guide.style-arrows .arrow { display: block; }
+
+/* Overlays */
+#countdown {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font: 600 min(40vh, 220px)/1 "Fredoka", "Segoe UI", sans-serif;
+  color: #fff;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+#countdown.on { display: flex; }
+
+#empty {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: #b7c7fb;
+  font-size: 18px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+#empty.on { display: flex; }
+
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%) translateY(10px);
+  max-width: 90%;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #13235e;
+  color: #eef0fb;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+#toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.error { background: #3a1630; border: 1px solid #7a2e4c; color: #ffd6dd; }
+
+#progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(127, 168, 255, 0.15);
+  pointer-events: none;
+}
+#progress-bar { height: 100%; width: 0; background: var(--guide); opacity: 0.8; }
+#progress.hidden, #timer.hidden { display: none; }
+
+#timer {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  font: 600 12px/1 "Segoe UI", sans-serif;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  text-shadow: 0 0 3px #000;
+}
+
+/* Hover toolbar: night ink like the main window, so the two read as one product. */
+#toolbar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #0b1847;
+  border: 1px solid #22377d;
+  box-shadow: 0 8px 24px rgba(0, 4, 20, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  cursor: grab;
+  white-space: nowrap;
+  z-index: 10;
+}
+#toolbar.on { opacity: 1; pointer-events: auto; }
+#toolbar .grip { color: #8d9fd6; padding: 0 6px 0 4px; font-size: 14px; letter-spacing: -2px; }
+#toolbar button {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 8px;
+  color: #eef0fb;
+  font: 600 12.5px "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+#toolbar button.text { padding: 0 10px; color: #b7c7fb; }
+#toolbar button:hover { background: #1b2f73; color: #eef0fb; }
+#toolbar button:focus-visible { outline: 2px solid #7fa8ff; outline-offset: 1px; }
+#toolbar button.active { background: #2f6fe8; color: #fff; }
+#toolbar button svg { width: 15px; height: 15px; fill: currentColor; }
+#toolbar #tb-play { background: #2f6fe8; color: #fff; min-width: 36px; }
+#toolbar #tb-play:hover { background: #3b7bf5; }
+#toolbar .sep { width: 1px; height: 18px; background: #22377d; margin: 0 4px; }
+#toolbar .speed { min-width: 28px; text-align: center; color: #eef0fb; font: 700 13px "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+#toolbar .mic { width: 8px; height: 8px; border-radius: 50%; background: #22377d; margin: 0 6px; transition: background-color 0.1s; }
+#toolbar .mic.live { background: #7fe0b0; }
+#toolbar .mic.idle { background: #8d9fd6; }
+#toolbar .mode { min-width: 64px; }
+
+/* Resize grips */
+.grip-r { position: absolute; z-index: 20; }
+.grip-r.n { top: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.grip-r.s { bottom: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.grip-r.e { right: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.grip-r.w { left: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.grip-r.ne { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+.grip-r.nw { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+.grip-r.se { bottom: 0; right: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+.grip-r.sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+#root.click-through .grip-r { display: none; }
+#root.hovered:not(.click-through) .grip-r.se::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.45);
+  border-bottom-right-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

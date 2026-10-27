@@ -1,0 +1,31 @@
+[package]
+name = "ghost-in-the-script"
+version = "1.2.0"
+description = "A teleprompter overlay that stays out of screen recordings"
+authors = ["Janitha Illankoon"]
+repository = "https://github.com/JanithaIllankoon/ghost-in-the-script"
+edition = "2021"
+
+[lib]
+name = "ghost_in_the_script_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+cpal = "0.16"
+libloading = "0.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

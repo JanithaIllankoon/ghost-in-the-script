@@ -1,0 +1,74 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Ghost In The Script",
+  "version": "1.2.0",
+  "identifier": "app.ghostprompter.desktop",
+  "build": {
+    "beforeDevCommand": "npm run setup:speech && npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run setup:speech && npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Ghost In The Script",
+        "url": "index.html",
+        "width": 1240,
+        "height": 740,
+        "minWidth": 900,
+        "minHeight": 560,
+        "center": true,
+        "contentProtected": true,
+        "dragDropEnabled": false,
+        "backgroundColor": "#050d2e"
+      },
+      {
+        "label": "prompter",
+        "title": "Ghost In The Script - Prompter",
+        "url": "prompter.html",
+        "width": 900,
+        "height": 340,
+        "minWidth": 260,
+        "minHeight": 120,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "resizable": true,
+        "contentProtected": true,
+        "dragDropEnabled": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "shortDescription": "Teleprompter overlay hidden from screen recordings",
+    "longDescription": "A teleprompter overlay with voice scrolling that screen recorders like Panopto, OBS, Teams and Zoom cannot capture.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "resources/vosk/": "vosk/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "publisher": "Janitha Illankoon",
+    "homepage": "https://github.com/JanithaIllankoon/ghost-in-the-script"
+  },
+  "mainBinaryName": "ghost-in-the-script"
+}

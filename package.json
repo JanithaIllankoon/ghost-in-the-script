@@ -1,0 +1,31 @@
+{
+  "name": "ghost-in-the-script",
+  "private": true,
+  "version": "1.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "setup:speech": "node scripts/fetch-speech.mjs",
+    "tauri": "tauri",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build"
+  },
+  "dependencies": {
+    "@fontsource/fredoka": "^5.3.0",
+    "@tauri-apps/api": "^2.12.4",
+    "jszip": "^3.10.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.5"
+  },
+  "description": "A teleprompter overlay for Windows that screen recorders can't see, with voice scrolling.",
+  "author": "Janitha Illankoon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JanithaIllankoon/ghost-in-the-script.git"
+  }
+}

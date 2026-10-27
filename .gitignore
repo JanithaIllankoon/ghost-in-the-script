@@ -1,0 +1,12 @@
+# Dependencies and build output
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Speech engine and model: downloaded by `npm run setup:speech` (about 120 MB)
+src-tauri/resources/vosk/
+
+# Local tooling
+.claude/
+*.log
