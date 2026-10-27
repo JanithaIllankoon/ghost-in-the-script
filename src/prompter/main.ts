@@ -70,10 +70,10 @@ document.getElementById("app")!.innerHTML = `
       <button id="tb-mode" class="mode text" title="Scroll mode (M)">Fixed</button>
       <span class="mic" id="tb-mic" title="Microphone"></span>
       <span class="sep"></span>
-      <button id="tb-through" class="text" title="Clicks pass through to the app underneath (Ctrl+Alt+K)">Click-through</button>
+      <button id="tb-through" class="text" title="Clicks pass through to the app underneath">Click-through</button>
       <button id="tb-controls" class="text" title="Open the main window">Controls</button>
       <button id="tb-help" class="text" title="Shortcuts and gestures (Ctrl+/)" aria-label="Shortcuts and gestures">?</button>
-      <button id="tb-hide" title="Hide the prompter (Ctrl+Alt+P brings it back)" aria-label="Hide the prompter">${ICON.close}</button>
+      <button id="tb-hide" title="Hide the prompter" aria-label="Hide the prompter">${ICON.close}</button>
     </div>
     ${["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((d) => `<div class="grip-r ${d}" data-dir="${d}"></div>`).join("")}
   </div>`;
@@ -189,7 +189,12 @@ function applySettings() {
   const order: ScrollMode[] = ["manual", "voice", "follow"];
   const next = order[(order.indexOf(s.mode) + 1) % order.length];
   $("tb-mode").title = `Scroll mode: ${MODE_LABELS[s.mode]}. Click to switch to ${MODE_LABELS[next]} (M)`;
+  // Tooltips name the current hotkeys, so they stay right after you change them.
+  const showKeys = (k: string) => k.replace(/\+/g, " + ");
   const ctKeys = s.hotkeys["toggle-click-through"];
+  const hideKeys = s.hotkeys["toggle-prompter"];
+  $("tb-through").title = `Clicks pass through to the app underneath${ctKeys ? ` (${showKeys(ctKeys)})` : ""}`;
+  $("tb-hide").title = hideKeys ? `Hide the prompter (${showKeys(hideKeys)} brings it back)` : "Hide the prompter (Show prompter in the main window brings it back)";
   const chip = $("ct-chip");
   chip.hidden = !s.clickThrough;
   chip.textContent = ctKeys ? `Click-through on · ${ctKeys.replace(/\+/g, " + ")} turns it off` : "Click-through on · turn it off from the tray icon";
