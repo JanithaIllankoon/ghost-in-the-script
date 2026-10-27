@@ -902,8 +902,11 @@ interface Notice {
   kind: "warn" | "info";
   text: string;
   action?: { label: string; run: () => void };
+  /** What the cross does besides hiding the message for now (e.g. remember it was read). */
+  onClose?: () => void;
 }
 let splashDone = false;
+const dismissedNotices = new Set<string>();
 let noticeSig = "";
 
 const keysFor = (a: Action) => S().hotkeys[a]?.replace(/\+/g, " + ") ?? "";
@@ -956,14 +959,17 @@ function currentNotices(): Notice[] {
       id: "tray-tip",
       kind: "info",
       text: `This window stays off the taskbar. Minimising sends it to the tray, by the clock.${k ? ` ${k} brings it back.` : ""}`,
-      action: { label: "Got it", run: () => set("seenTrayTip", true) },
+      onClose: () => set("seenTrayTip", true),
     });
   }
   return out;
 }
 
 function renderNotices() {
-  const list = currentNotices();
+  const all = currentNotices();
+  // A message that goes away and comes back later should show again.
+  for (const id of [...dismissedNotices]) if (!all.some((n) => n.id === id)) dismissedNotices.delete(id);
+  const list = all.filter((n) => !dismissedNotices.has(n.id));
   const sig = list.map((n) => n.id + n.text).join("|");
   if (sig === noticeSig) return;
   noticeSig = sig;
@@ -971,7 +977,17 @@ function renderNotices() {
   host.textContent = "";
   for (const n of list) {
     const row = el("div", `notice ${n.kind}`);
-    row.append(el("span", "dot"), el("span", "text", n.text));
+    const close = el("button", "notice-close");
+    close.type = "button";
+    close.setAttribute("aria-label", "Dismiss this message");
+    close.title = "Dismiss";
+    close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    close.onclick = () => {
+      dismissedNotices.add(n.id);
+      n.onClose?.();
+      renderNotices();
+    };
+    row.append(el("span", "text", n.text), close);
     if (n.action) {
       const b = el("button", "btn small", n.action.label);
       b.onclick = n.action.run;
