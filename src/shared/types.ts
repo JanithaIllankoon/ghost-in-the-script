@@ -53,6 +53,14 @@ export const DEFAULT_HOTKEYS: Record<Action, string> = {
   screenshot: "Ctrl+Alt+S",
 };
 
+export type PrompterTheme = "dark" | "light";
+
+/** Colours applied when the prompter's light/dark switch changes. Everything else stays as the person set it. */
+export const PROMPTER_PALETTES: Record<PrompterTheme, { textColor: string; bgColor: string; cueColor: string; highlightColor: string; guideColor: string }> = {
+  dark: { textColor: "#f4f5ff", bgColor: "#050d2e", cueColor: "#e9b75f", highlightColor: "#2f6fe8", guideColor: "#7fa8ff" },
+  light: { textColor: "#16213a", bgColor: "#f6f8fd", cueColor: "#a86a00", highlightColor: "#2463d4", guideColor: "#2463d4" },
+};
+
 export interface Settings {
   // Text
   fontFamily: string;
@@ -68,6 +76,7 @@ export interface Settings {
   textOutline: boolean;
 
   // Colours
+  prompterTheme: PrompterTheme;
   textColor: string;
   bgColor: string;
   bgOpacity: number; // 0-100
@@ -129,6 +138,7 @@ export const DEFAULT_SETTINGS: Settings = {
   marginX: 6,
   textOutline: true,
 
+  prompterTheme: "dark",
   textColor: "#f4f5ff",
   bgColor: "#050d2e",
   bgOpacity: 78,

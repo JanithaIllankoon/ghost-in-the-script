@@ -13,6 +13,7 @@ import {
   DATA_VERSION,
   DEFAULT_SETTINGS,
   MODE_LABELS,
+  PROMPTER_PALETTES,
   linesPerSecond,
   normalizeData,
   type Action,
@@ -32,6 +33,18 @@ const ICON = {
   rewind: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="3" height="14" rx="1"/><path d="M20 5v14L8.5 12z"/></svg>',
   minus: '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="3" rx="1.5"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="3" rx="1.5"/><rect x="10.5" y="5" width="3" height="14" rx="1.5"/></svg>',
+  prev: '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="2.6" height="14" rx="1"/><path d="M19 5.5v13L9 12z"/></svg>',
+  next: '<svg viewBox="0 0 24 24"><rect x="16.4" y="5" width="2.6" height="14" rx="1"/><path d="M5 5.5v13L15 12z"/></svg>',
+  wave: '<svg viewBox="0 0 24 24"><rect x="3" y="10" width="2.2" height="4" rx="1.1"/><rect x="7" y="7" width="2.2" height="10" rx="1.1"/><rect x="11" y="4" width="2.2" height="16" rx="1.1"/><rect x="15" y="8" width="2.2" height="8" rx="1.1"/><rect x="19" y="10.5" width="2.2" height="3" rx="1.1"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" class="stroke"><path d="m6 9.5 6 6 6-6"/></svg>',
+  chevL: '<svg viewBox="0 0 24 24" class="stroke"><path d="m14.5 6-6 6 6 6"/></svg>',
+  chevR: '<svg viewBox="0 0 24 24" class="stroke"><path d="m9.5 6 6 6-6 6"/></svg>',
+  cursor: '<svg viewBox="0 0 24 24"><path d="M6 3.5v15.2l4.2-3.7 2.8 6 2.6-1.2-2.8-5.9H19z"/></svg>',
+  moon: '<svg viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" class="stroke"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" class="stroke"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  help: '<svg viewBox="0 0 24 24" class="stroke"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.7 2.2c-.8.5-1.2 1-1.2 1.8M12 16.8h.01"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" class="stroke"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6.3 4.2 12 9.9l5.7-5.7 2.1 2.1-5.7 5.7 5.7 5.7-2.1 2.1-5.7-5.7-5.7 5.7-2.1-2.1 5.7-5.7-5.7-5.7z"/></svg>',
 };
 
@@ -44,7 +57,7 @@ document.getElementById("app")!.innerHTML = `
     <div id="empty">No script yet.<br/>Write or import one in the Ghost In The Script window.</div>
     <div id="countdown"></div>
     <div id="progress"><div id="progress-bar"></div></div>
-    <div id="timer"></div>
+    <div id="timer">${ICON.clock}<span id="timer-text"></span></div>
     <div id="toast"></div>
     <div id="ct-chip" hidden></div>
     <div id="tip" role="dialog" aria-label="How to move the prompter" hidden>
@@ -58,22 +71,63 @@ document.getElementById("app")!.innerHTML = `
         <div class="help-body" id="help-body"></div>
       </div>
     </div>
+    <button class="side-arrow left" id="side-prev" title="Back one line" aria-label="Back one line">${ICON.chevL}</button>
+    <button class="side-arrow right" id="side-next" title="Forward one line" aria-label="Forward one line">${ICON.chevR}</button>
     <div id="toolbar" data-tauri-drag-region>
       <span class="grip" data-tauri-drag-region title="Drag to move the prompter">⋮⋮</span>
-      <button id="tb-play" title="Play or pause (Space)" aria-label="Play or pause">${ICON.play}</button>
-      <button id="tb-rewind" title="Back to the start (Home)" aria-label="Back to the start">${ICON.rewind}</button>
-      <span class="sep"></span>
-      <button id="tb-slower" title="Slower (Down arrow)" aria-label="Slower">${ICON.minus}</button>
-      <span class="speed" id="tb-speed" title="Speed">22</span>
-      <button id="tb-faster" title="Faster (Up arrow)" aria-label="Faster">${ICON.plus}</button>
-      <span class="sep"></span>
-      <button id="tb-mode" class="mode text" title="Scroll mode (M)">Fixed</button>
-      <span class="mic" id="tb-mic" title="Microphone"></span>
-      <span class="sep"></span>
-      <button id="tb-through" class="text" title="Clicks pass through to the app underneath">Click-through</button>
-      <button id="tb-controls" class="text" title="Open the main window">Controls</button>
-      <button id="tb-help" class="text" title="Shortcuts and gestures (Ctrl+/)" aria-label="Shortcuts and gestures">?</button>
-      <button id="tb-hide" title="Hide the prompter" aria-label="Hide the prompter">${ICON.close}</button>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-play" class="round" title="Play or pause (Space)" aria-label="Play or pause">${ICON.play}</button>
+        <span class="tb-label" id="tb-play-label" data-tauri-drag-region>Play</span>
+      </div>
+      <span class="sep" data-tauri-drag-region></span>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-prev" title="Back one line (Page Up)" aria-label="Back one line">${ICON.prev}</button>
+        <span class="tb-label" data-tauri-drag-region>Previous</span>
+      </div>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-next" title="Forward one line (Page Down)" aria-label="Forward one line">${ICON.next}</button>
+        <span class="tb-label" data-tauri-drag-region>Next</span>
+      </div>
+      <span class="sep" data-tauri-drag-region></span>
+      <div class="tb-item" data-tauri-drag-region>
+        <div class="stepper" data-tauri-drag-region>
+          <button id="tb-slower" class="sq" title="Slower (Down arrow)" aria-label="Slower">${ICON.minus}</button>
+          <span class="speed" id="tb-speed" title="Speed" data-tauri-drag-region>22</span>
+          <button id="tb-faster" class="sq" title="Faster (Up arrow)" aria-label="Faster">${ICON.plus}</button>
+        </div>
+        <span class="tb-label" data-tauri-drag-region>Speed</span>
+      </div>
+      <span class="sep" data-tauri-drag-region></span>
+      <div class="tb-item mode-item" data-tauri-drag-region>
+        <button id="tb-mode" class="select" title="Scroll mode (M)" aria-haspopup="menu" aria-expanded="false">${ICON.wave}<span id="tb-mode-text">Fixed speed</span>${ICON.chevron}<span class="mic" id="tb-mic" title="Microphone"></span></button>
+        <span class="tb-label" data-tauri-drag-region>Scrolling mode</span>
+        <div id="mode-menu" role="menu" hidden>
+          ${(["manual", "voice", "follow"] as ScrollMode[]).map((m) => `<button role="menuitemradio" data-mode="${m}">${MODE_LABELS[m]}</button>`).join("")}
+        </div>
+      </div>
+      <span class="sep" data-tauri-drag-region></span>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-through" class="toggle" role="switch" aria-checked="false" title="Clicks pass through to the app underneath">${ICON.cursor}<span class="knob" aria-hidden="true"><span></span></span></button>
+        <span class="tb-label" data-tauri-drag-region>Click-through</span>
+      </div>
+      <span class="sep" data-tauri-drag-region></span>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-theme" title="Switch between dark and light" aria-label="Switch between dark and light">${ICON.moon}</button>
+        <span class="tb-label" id="tb-theme-label" data-tauri-drag-region>Dark</span>
+      </div>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-controls" title="Show or hide the main window" aria-label="Show or hide the main window">${ICON.eye}</button>
+        <span class="tb-label" data-tauri-drag-region>Controls</span>
+      </div>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-help" title="Shortcuts and gestures (Ctrl+/)" aria-label="Shortcuts and gestures">${ICON.help}</button>
+        <span class="tb-label" data-tauri-drag-region>Help</span>
+      </div>
+      <span class="sep" data-tauri-drag-region></span>
+      <div class="tb-item" data-tauri-drag-region>
+        <button id="tb-hide" title="Hide the prompter" aria-label="Hide the prompter">${ICON.close}</button>
+        <span class="tb-label" data-tauri-drag-region>Close</span>
+      </div>
     </div>
     ${["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((d) => `<div class="grip-r ${d}" data-dir="${d}"></div>`).join("")}
   </div>`;
@@ -184,8 +238,13 @@ function applySettings() {
   progressEl.classList.toggle("hidden", !s.showProgress);
   timerEl.classList.toggle("hidden", !s.showTimer);
 
+  root.dataset.theme = s.prompterTheme;
+  $("tb-theme").innerHTML = s.prompterTheme === "dark" ? ICON.moon : ICON.sun;
+  $("tb-theme-label").textContent = s.prompterTheme === "dark" ? "Dark" : "Light";
+  $("tb-theme").title = `Switch to ${s.prompterTheme === "dark" ? "light" : "dark"} mode`;
   $("tb-speed").textContent = String(s.speed);
-  $("tb-mode").textContent = { manual: "Fixed", voice: "Voice", follow: "Follow" }[s.mode];
+  $("tb-mode-text").textContent = MODE_LABELS[s.mode];
+  document.querySelectorAll<HTMLElement>("#mode-menu button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.mode === s.mode)));
   const order: ScrollMode[] = ["manual", "voice", "follow"];
   const next = order[(order.indexOf(s.mode) + 1) % order.length];
   $("tb-mode").title = `Scroll mode: ${MODE_LABELS[s.mode]}. Click to switch to ${MODE_LABELS[next]} (M)`;
@@ -199,6 +258,7 @@ function applySettings() {
   chip.hidden = !s.clickThrough;
   chip.textContent = ctKeys ? `Click-through on · ${ctKeys.replace(/\+/g, " + ")} turns it off` : "Click-through on · turn it off from the tray icon";
   $("tb-through").classList.toggle("active", s.clickThrough);
+  $("tb-through").setAttribute("aria-checked", String(s.clickThrough));
   root.classList.toggle("click-through", s.clickThrough);
 
   win.setAlwaysOnTop(s.alwaysOnTop).catch(() => {});
@@ -339,6 +399,7 @@ function startPlaying() {
   velocity = 0;
   if (settings.mode === "follow") followTarget = y;
   $("tb-play").innerHTML = ICON.pause;
+  $("tb-play-label").textContent = "Pause";
   sendStatus();
 }
 
@@ -348,6 +409,7 @@ function stop() {
   clearInterval(countdownTimer);
   countdownEl.classList.remove("on");
   $("tb-play").innerHTML = ICON.play;
+  $("tb-play-label").textContent = "Play";
   syncVoice();
   sendStatus();
 }
@@ -425,8 +487,7 @@ function runAction(a: Action | string) {
       const k = settings.hotkeys["toggle-click-through"];
       if (on) {
         // The toolbar can't be clicked any more, so get it out of the way of the badge.
-        toolbar.classList.remove("on");
-        root.classList.remove("hovered");
+        hideToolbar();
       }
       toast(on
         ? `Click-through on: clicks go to the app underneath. ${k ? `Press ${k.replace(/\+/g, " + ")}` : "Use the tray icon"} to turn it off.`
@@ -524,7 +585,7 @@ function estimate(now: number) {
 function drawTimer(now: number) {
   lastTimerDraw = now;
   const { remaining } = estimate(now);
-  timerEl.textContent = `${fmt(elapsed)}  ·  -${fmt(remaining)}`;
+  $("timer-text").textContent = `${fmt(elapsed)}  /  ${fmt(elapsed + remaining)}`;
 }
 
 // ---------- Status for the controls window ----------
@@ -680,10 +741,38 @@ listen<string>("gp:hotkey", (e) => runAction(e.payload));
 
 // Toolbar
 $("tb-play").onclick = () => togglePlay();
-$("tb-rewind").onclick = () => rewind();
+$("tb-prev").onclick = () => runAction("back");
+$("tb-next").onclick = () => runAction("forward");
+$("side-prev").onclick = () => runAction("back");
+$("side-next").onclick = () => runAction("forward");
+$("tb-theme").onclick = () => {
+  const next = settings.prompterTheme === "dark" ? "light" : "dark";
+  patchSettings({ prompterTheme: next, ...PROMPTER_PALETTES[next] });
+  toast(next === "dark" ? "Dark prompter" : "Light prompter");
+};
+
+// Scrolling mode picker: a small menu under the toolbar.
+const modeMenu = $("mode-menu");
+function closeModeMenu() {
+  modeMenu.hidden = true;
+  $("tb-mode").setAttribute("aria-expanded", "false");
+}
+$("tb-mode").onclick = (e) => {
+  e.stopPropagation();
+  modeMenu.hidden = !modeMenu.hidden;
+  $("tb-mode").setAttribute("aria-expanded", String(!modeMenu.hidden));
+};
+modeMenu.querySelectorAll<HTMLElement>("button").forEach((b) => {
+  b.onclick = (e) => {
+    e.stopPropagation();
+    setMode(b.dataset.mode as ScrollMode);
+    sendStatus();
+    closeModeMenu();
+  };
+});
+document.addEventListener("click", closeModeMenu);
 $("tb-slower").onclick = () => changeSpeed(-1);
 $("tb-faster").onclick = () => changeSpeed(+1);
-$("tb-mode").onclick = () => runAction("cycle-mode");
 $("tb-through").onclick = () => runAction("toggle-click-through");
 $("tb-controls").onclick = () => invoke("run_action", { action: "toggle-controls" });
 $("tb-hide").onclick = () => {
@@ -733,23 +822,24 @@ listen("gp:main-to-tray", () => {
 
 // Toolbar shows while the mouse is over the window
 let hideToolbarTimer: number | undefined;
+function hideToolbar() {
+  toolbar.classList.remove("on");
+  root.classList.remove("hovered");
+  closeModeMenu();
+}
 function showToolbar() {
   if (settings.clickThrough || tipShowing) return;
   toolbar.classList.add("on");
   root.classList.add("hovered");
   clearTimeout(hideToolbarTimer);
   hideToolbarTimer = window.setTimeout(() => {
-    if (!toolbar.matches(":hover")) {
-      toolbar.classList.remove("on");
-      root.classList.remove("hovered");
-    }
+    if (!toolbar.matches(":hover") && modeMenu.hidden) hideToolbar();
   }, 2200);
 }
 document.addEventListener("mousemove", showToolbar);
 document.addEventListener("mouseleave", () => {
   if (tipShowing) return;
-  toolbar.classList.remove("on");
-  root.classList.remove("hovered");
+  hideToolbar();
 });
 
 // Resize from the edges (the window has no frame)

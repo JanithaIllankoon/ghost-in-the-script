@@ -14,6 +14,7 @@ import { countWords } from "../shared/markup";
 import { WELCOME_SCRIPT, WELCOME_TITLE } from "../shared/sample";
 import {
   ACTION_LABELS,
+  PROMPTER_PALETTES,
   DATA_VERSION,
   DEFAULT_HOTKEYS,
   DEFAULT_SETTINGS,
@@ -86,7 +87,9 @@ function cmd(c: PrompterCommand) {
 }
 
 function set<K extends keyof Settings>(key: K, value: Settings[K]) {
-  data.settings = { ...S(), [key]: value };
+  // Switching the prompter between light and dark also swaps its text, background, cue, highlight and guide colours.
+  const extra = key === "prompterTheme" ? PROMPTER_PALETTES[value as Settings["prompterTheme"]] : {};
+  data.settings = { ...S(), [key]: value, ...extra };
   save();
   pushSettings();
   if (key === "hidePrompterFromCapture" || key === "hideControlsFromCapture") applyCapture();
@@ -566,6 +569,7 @@ const TABS: { id: string; label: string; fields: Field[] }[] = [
   {
     id: "look", label: "Colours",
     fields: [
+      { type: "seg", key: "prompterTheme", label: "Prompter theme", options: [["dark", "Dark"], ["light", "Light"]] },
       { type: "custom", render: renderPresets },
       { type: "color", key: "textColor", label: "Text" },
       { type: "color", key: "bgColor", label: "Background" },
