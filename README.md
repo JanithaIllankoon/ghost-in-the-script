@@ -74,9 +74,15 @@ If you used an earlier test build called "Ghost Prompter", uninstall it from **S
 | Show / hide the prompter | Ctrl+Alt+P |
 | Show / hide the main window | Ctrl+Alt+O |
 
-Change them under **All settings > Hotkeys**.
+Change them under **All settings > Hotkeys**. If another app already uses one, the main window tells you and offers to change it.
+
+**Every shortcut in one place:** press **Ctrl+/** in either window, select **Keyboard shortcuts and gestures** under the Start button, or press **?** on the prompter's toolbar.
 
 When the prompter has focus: Space plays and pauses, Up and Down change the speed, PageUp and PageDown move a line, Home rewinds, and M switches mode. The mouse wheel scrolls by hand, and double-clicking a word jumps there.
+
+**Click-through** lets clicks pass through the prompter to the app underneath. While it's on, a small badge on the prompter says so. Turn it off with **Ctrl+Alt+K**, the **Turn off** button in the main window, or **Turn off click-through** in the tray menu.
+
+**Tray menu** (right-click the ghost near the clock): show the main window, show or hide the prompter, play or pause, turn off click-through, move the prompter to the top centre (handy if it ends up off-screen), and quit.
 
 ### Script formatting
 
