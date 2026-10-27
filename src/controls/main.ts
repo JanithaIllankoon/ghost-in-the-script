@@ -129,9 +129,6 @@ const ICONS = {
   eyeOff: icon('<path d="M3 3l18 18"/><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4 9.5 6a14 14 0 0 1-2.9 3.6M6.4 7.6A14 14 0 0 0 2.5 12c1 2 4.5 6 9.5 6 1.4 0 2.6-.3 3.7-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
   pin: icon('<path d="M9 4h6l-1 5 3 3v1.5H7V12l3-3z"/><path d="M12 13.5V20"/>'),
   tray: icon('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 14h5l1 2h5l1-2h5"/>'),
-  pencil: icon('<path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 2.8 0l.2.2a2 2 0 0 1 0 2.8L8 19z"/><path d="M14.5 6.5l3 3"/>'),
-  prev: icon('<path d="m14.5 6-6 6 6 6"/>'),
-  next: icon('<path d="m9.5 6 6 6-6 6"/>'),
 };
 
 /** Short mode descriptions for the three cards; the longer ones live in MODE_HINTS. */
@@ -274,16 +271,6 @@ document.getElementById("app")!.innerHTML = `
         </div>
 
         <div class="quick" id="quick"></div>
-
-        <section>
-          <h2 class="group-title">Preview &amp; test</h2>
-          <div class="preview">
-            <button class="pv-nav" id="pv-prev" aria-label="Previous line">${ICONS.prev}</button>
-            <p class="pv-text" id="pv-text"></p>
-            <button class="pv-nav" id="pv-next" aria-label="Next line">${ICONS.next}</button>
-            <button class="pv-edit" id="pv-edit" title="Edit this script" aria-label="Edit this script">${ICONS.pencil}</button>
-          </div>
-        </section>
 
         <div class="panel-actions">
           <button class="btn primary" id="btn-prompter">${ICONS.pin}<span id="btn-prompter-label">Show prompter</span></button>
@@ -1218,29 +1205,8 @@ function updateStats() {
   const dur = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
   for (const id of ["wc", "wc2"]) $(id).textContent = String(wc);
   for (const id of ["dur", "dur2"]) $(id).textContent = dur;
-  renderPreview();
 }
 
-// ---------- Preview & test: step through the script a sentence at a time ----------
-let previewIndex = 0;
-function previewLines(): string[] {
-  return bodyEl.value
-    .replace(/\{[^}]*\}|\[[^\]]*\]|[*_=]{2,}|(?<![\w*])\*|\*(?![\w*])/g, "")
-    .split(/\n+/)
-    .flatMap((p) => p.split(/(?<=[.!?])\s+/))
-    .map((l) => l.trim())
-    .filter(Boolean);
-}
-function renderPreview() {
-  const lines = previewLines();
-  previewIndex = Math.min(previewIndex, Math.max(0, lines.length - 1));
-  $("pv-text").textContent = lines[previewIndex] ?? "Your script will show here.";
-  $<HTMLButtonElement>("pv-prev").disabled = previewIndex <= 0;
-  $<HTMLButtonElement>("pv-next").disabled = previewIndex >= lines.length - 1;
-}
-$("pv-prev").onclick = () => { previewIndex = Math.max(0, previewIndex - 1); renderPreview(); };
-$("pv-next").onclick = () => { previewIndex += 1; renderPreview(); };
-$("pv-edit").onclick = () => bodyEl.focus();
 
 function selectScript(id: string) {
   data.activeScriptId = id;

@@ -6,7 +6,7 @@ The workspace uses a clean, quiet layout with a light theme by default and a nav
 
 - A left sidebar holds the logo, navigation (Scripts, Settings, Hotkeys, Appearance, About), New script and Import file, the searchable script list, and a footer with the author credit, version and the light/dark switch.
 - The editor is a rounded card with the script title and word count in its header, Duplicate, Save and Delete beside them, a formatting toolbar, and a footer with the word count and save state.
-- The Present panel on the right starts with the Start prompting button and its hotkey, then playback progress, three scrolling-mode cards, speed and text size sliders, a sentence-by-sentence Preview & test, Show prompter and Minimise to tray, and a Recording protection switch with its status line. It scrolls on its own.
+- The Present panel on the right starts with the Start prompting button and its hotkey, then playback progress, three scrolling-mode cards, speed and text size sliders, Show prompter and Minimise to tray, and a Recording protection switch with its status line. It scrolls on its own.
 - Settings and shortcut sheets remain available on demand.
 
 ## Prompter toolbar
