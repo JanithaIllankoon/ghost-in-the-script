@@ -19,7 +19,9 @@
 
 You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right under your webcam so you can read it while looking at the camera. The recording only shows your slides.
 
-![The main window with scripts and navigation on the left, the editor in the middle and the Present panel on the right, with the prompter and its toolbar floating on top](docs/v1.5.1/light.png)
+![The prompter and its toolbar floating over the main window while the script scrolls in Voice Activated mode](docs/v1.5.2/light.png)
+
+![The main window with scripts and navigation on the left, the editor in the middle and the Present panel on the right](docs/v1.5.2/main.png)
 
 ## What it does
 
