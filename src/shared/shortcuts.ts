@@ -27,9 +27,9 @@ export function shortcutSections(s: Settings, problems: HotkeyProblem[], include
   });
 
   const sections: ShortcutSection[] = [
-    { title: "From any app", note: "These work even while Panopto or another app is in front.", rows: global },
+    { title: "From Any App", note: "These work even while Panopto or another app is in front.", rows: global },
     {
-      title: "On the prompter",
+      title: "On the Prompter",
       note: "Click the prompter first, so it's listening for keys.",
       rows: [
         { keys: "Space", label: "Play / pause" },
@@ -43,7 +43,7 @@ export function shortcutSections(s: Settings, problems: HotkeyProblem[], include
       ],
     },
     {
-      title: "Mouse on the prompter",
+      title: "Mouse on the Prompter",
       rows: [
         { keys: "Hover", label: "Shows the toolbar", isMouse: true },
         { keys: "Drag the dotted handle", label: "Moves the prompter (or hold Alt and drag anywhere)", isMouse: true },
@@ -56,7 +56,7 @@ export function shortcutSections(s: Settings, problems: HotkeyProblem[], include
 
   if (include.editor) {
     sections.push({
-      title: "In the script editor",
+      title: "In the Script Editor",
       rows: [
         { keys: "Ctrl+B", label: "Bold" },
         { keys: "Ctrl+I", label: "Italic" },
@@ -69,7 +69,7 @@ export function shortcutSections(s: Settings, problems: HotkeyProblem[], include
   }
 
   sections.push({
-    title: "Tray icon (the ghost near the clock)",
+    title: "Tray Icon (The Ghost Near the Clock)",
     rows: [
       { keys: "Click", label: "Opens the main window", isMouse: true },
       { keys: "Right-click", label: "Play or pause, show or hide the prompter, turn off click-through, move the prompter to the top centre, quit", isMouse: true },

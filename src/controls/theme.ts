@@ -21,7 +21,7 @@ export function initTheme() {
   const update = () => {
     document.documentElement.dataset.theme = theme;
     toggle.setAttribute("aria-checked", String(theme === "dark"));
-    label.textContent = theme === "dark" ? "Dark mode" : "Light mode";
+    label.textContent = theme === "dark" ? "Dark Mode" : "Light Mode";
     toggle.title = `Switch to ${theme === "dark" ? "light" : "dark"} mode`;
     getCurrentWindow().setTheme(theme).catch((error) => console.warn("Could not update the window theme", error));
   };

@@ -16,10 +16,10 @@ export function splashHtml(): string {
       <img class="splash-logo" id="splash-logo" src="${logoUrl}" alt="" />
       <h1 id="splash-title">Ghost In The Script</h1>
       <p class="splash-made">Made by <strong>${AUTHOR}</strong></p>
-      <p class="splash-ask" id="splash-ask">If it saves you a retake, a star on GitHub helps other presenters find it.</p>
+      <p class="splash-ask" id="splash-ask">If it saves you a retake, a star on GitHub<br />helps other presenters find it.</p>
       <div class="splash-actions">
         <button class="btn splash-star" id="splash-star">${STAR}<span>Star on GitHub</span></button>
-        <button class="btn primary splash-continue" id="splash-continue" aria-disabled="true">Continue to the app</button>
+        <button class="btn primary splash-continue" id="splash-continue" aria-disabled="true">Continue to the App</button>
       </div>
       <p class="splash-status" id="splash-status" role="status">Opening your scripts…</p>
     </div>
@@ -31,7 +31,7 @@ export function creditHtml(): string {
   <div class="credit" id="credit">
     <img class="credit-logo" id="credit-logo" src="${logoUrl}" alt="" />
     <div class="credit-text"><span>Made by</span><b>${AUTHOR}</b></div>
-    <button class="btn small credit-star" id="credit-star" title="Opens the project on GitHub" aria-label="Star Ghost In The Script on GitHub">${STAR}<span>Star</span></button>
+    <button class="btn small credit-star" id="credit-star" title="Opens the project on GitHub" aria-label="Star Ghost In The Script on GitHub">${STAR}</button>
   </div>`;
 }
 
@@ -74,14 +74,15 @@ export function initSplash(opts: SplashOptions) {
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const from = $("splash-logo");
     const to = $("credit-logo");
-    const credit = $("credit");
+    const star = $("credit-star");
     to.scrollIntoView({ block: "nearest" });
 
     const done = () => {
       splash.hidden = true;
       to.style.visibility = "";
-      credit.classList.add("highlight");
-      credit.addEventListener("animationend", () => credit.classList.remove("highlight"), { once: true });
+      // Once the ghost lands, the star next to it pops with a yellow glow.
+      star.classList.add("pop");
+      star.addEventListener("animationend", () => star.classList.remove("pop"), { once: true });
       opts.onContinue();
     };
 

@@ -6,7 +6,7 @@ This prompter floats on top of your other windows, but screen recorders like Pan
 
 [TRY IT] Press play, or press **Ctrl + Alt + Space** from any app. Use **Ctrl + Alt + Up** and **Ctrl + Alt + Down** to change the speed while it scrolls.
 
-There are three ways to scroll. *Fixed speed* moves at a steady pace. *Voice-activated* moves while you are talking and stops when you pause. *Follow my voice* listens to your words and keeps your place, even if you slow down, speed up or stop to answer a question.
+There are three ways to scroll. *Fixed Speed* moves at a steady pace. *Voice Activated* moves while you are talking and stops when you pause. *Follow My Voice* listens to your words and keeps your place, even if you slow down, speed up or stop to answer a question.
 
 [FORMATTING] You can make words **bold**, *italic*, __underlined__ or ==highlighted==. Put notes to yourself in square brackets, like the cue at the start of this paragraph. They show in a different colour and voice tracking skips them. You can even use {orange}your own colours{/}.
 

@@ -23,11 +23,11 @@ You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right 
 
 ## What it does
 
-**Light and dark themes.** v1.5.0 added a clean workspace, and v1.5.1 reworks it into a sidebar with your scripts, an editor card, and a Present panel with scrolling-mode cards and speed and text size sliders. Use the switch at the bottom of the sidebar to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. The prompter has its own light/dark button on its toolbar (also under **Settings > Colours > Prompter theme**); it swaps the prompter's text, background, cue, highlight and guide colours.
+**Light and dark themes.** v1.5.0 added a clean workspace, and v1.5.1 reworks it into a sidebar with your scripts, an editor card, and a Present panel with scrolling-mode cards and speed and text size sliders. Use the switch at the bottom of the sidebar to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. The prompter has its own light/dark button on its toolbar; it swaps the prompter's text, background, cue, highlight, guide and outline colours. The letter outline colour can also be set under **Settings > Text > Outline Colour**.
 
 **Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The **Recording protection** switch in the Present panel is green while it's on and red when it's off. Tested with Panopto.
 
-**Screenshots on request.** Because the hiding covers screenshots too, v1.5.1 adds an **Allow screenshots** switch under **Settings > Window**. While it's on, the prompter and the main window show up in Print Screen and Snipping Tool (and in recordings, so turn it off before you record). **Ctrl+Alt+S** flips it from any app.
+**Screenshots on request.** Because the hiding covers screenshots too, v1.5.1 adds an **Allow Screenshots** switch under **Settings > Window**. While it's on, the prompter and the main window show up in Print Screen and Snipping Tool (and in recordings, so turn it off before you record). **Ctrl+Alt+S** flips it from any app.
 
 **Off the taskbar too.** A full-screen recording also captures your taskbar, so by default the app keeps no taskbar button there. Open it from the ghost in the tray, near the clock, or with **Ctrl+Alt+O**. Minimising the main window sends it to the tray. You can turn this off under **Settings > Window**.
 
@@ -35,9 +35,9 @@ You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right 
 
 | Mode | What happens |
 |---|---|
-| Fixed speed | Scrolls at a steady speed. Change it while it runs with the hotkeys or the slider. |
-| Voice-activated | Scrolls while you talk and stops when you pause. |
-| Follow my voice | Listens to your words and keeps the line you're reading on the guide. It waits while you ad-lib, catches up if you skip a line, and jumps if you start reading somewhere else. |
+| Fixed Speed | Scrolls at a steady speed. Change it while it runs with the hotkeys or the slider. |
+| Voice Activated | Scrolls while you talk and stops when you pause. |
+| Follow My Voice | Listens to your words and keeps the line you're reading on the guide. It waits while you ad-lib, catches up if you skip a line, and jumps if you start reading somewhere else. |
 
 Speech recognition runs on your PC with [Vosk](https://alphacephei.com/vosk/). Nothing you say leaves your computer.
 
@@ -60,9 +60,11 @@ If you used an earlier test build called "Ghost Prompter", uninstall it from **S
 
 ## Using it
 
+The prompter doesn't open by itself: press **Show Prompter** or **Start Prompting**. The first time it opens, three short tips appear one after another, each pointing at what it's about: the dotted handle for moving it, the **Click Through** switch, and the blue reading guide. The last two have a **Settings** button that opens their options in the main window. Press **Got It** to move on.
+
 1. Write or paste your script, or import a file.
 2. Pick how it should scroll.
-3. Press **Start prompting**, or **Ctrl + Alt + Space** from any app.
+3. Press **Start Prompting**, or **Ctrl + Alt + Space** from any app.
 4. Drag the prompter under your webcam by the dotted handle under the toolbar that appears when you hover over it. Resize it from any edge.
 
 ### Hotkeys
@@ -90,16 +92,21 @@ When the prompter has focus: Space plays and pauses, Up and Down change the spee
 
 ### Script formatting
 
+Press the eye icon at the bottom right of the editor to preview the script with its formatting applied. Press the pencil icon, or double-click the preview, to go back to the text.
+
 ```
 **bold**   *italic*   __underline__   ==highlight==
 [note to yourself]     shown in gold, skipped by voice tracking
 {red}coloured words{/} any colour name or #hex
 blank line             new paragraph
+\*  \_  \=  \[  \{     the character itself, not a mark
 ```
+
+Marks pair up within a paragraph. A mark with no partner, like the star in `5 * 3`, shows as typed. Extra marks show as text, so `****Bold****` is **\*\*Bold\*\*** in bold.
 
 ### Other languages
 
-The built-in speech model is English. For another language, or better accuracy, download a model from the [Vosk model list](https://alphacephei.com/vosk/models), unzip it, and paste the folder path under **Settings > Voice > Speech model folder**.
+The built-in speech model is English. For another language, or better accuracy, download a model from the [Vosk model list](https://alphacephei.com/vosk/models), unzip it, and paste the folder path under **Settings > Voice > Speech Model Folder**.
 
 ## Limits
 

@@ -1,9 +1,9 @@
 export type ScrollMode = "manual" | "voice" | "follow";
 
 export const MODE_LABELS: Record<ScrollMode, string> = {
-  manual: "Fixed speed",
-  voice: "Voice-activated",
-  follow: "Follow my voice",
+  manual: "Fixed Speed",
+  voice: "Voice Activated",
+  follow: "Follow My Voice",
 };
 
 export const MODE_HINTS: Record<ScrollMode, string> = {
@@ -26,17 +26,17 @@ export type Action =
   | "screenshot";
 
 export const ACTION_LABELS: Record<Action, string> = {
-  "play-pause": "Play / pause",
-  "speed-up": "Speed up",
-  "speed-down": "Slow down",
-  back: "Back one line",
-  forward: "Forward one line",
-  rewind: "Back to start",
-  "cycle-mode": "Switch scroll mode",
-  "toggle-click-through": "Click-through on/off",
-  "toggle-prompter": "Show / hide prompter",
-  "toggle-controls": "Show / hide controls",
-  screenshot: "Screenshots on/off",
+  "play-pause": "Play / Pause",
+  "speed-up": "Speed Up",
+  "speed-down": "Slow Down",
+  back: "Back One Line",
+  forward: "Forward One Line",
+  rewind: "Back to Start",
+  "cycle-mode": "Switch Scroll Mode",
+  "toggle-click-through": "Click Through On/Off",
+  "toggle-prompter": "Show / Hide Prompter",
+  "toggle-controls": "Show / Hide Controls",
+  screenshot: "Screenshots On/Off",
 };
 
 export const DEFAULT_HOTKEYS: Record<Action, string> = {
@@ -56,9 +56,9 @@ export const DEFAULT_HOTKEYS: Record<Action, string> = {
 export type PrompterTheme = "dark" | "light";
 
 /** Colours applied when the prompter's light/dark switch changes. Everything else stays as the person set it. */
-export const PROMPTER_PALETTES: Record<PrompterTheme, { textColor: string; bgColor: string; cueColor: string; highlightColor: string; guideColor: string }> = {
-  dark: { textColor: "#f4f5ff", bgColor: "#050d2e", cueColor: "#e9b75f", highlightColor: "#2f6fe8", guideColor: "#7fa8ff" },
-  light: { textColor: "#16213a", bgColor: "#f6f8fd", cueColor: "#a86a00", highlightColor: "#2463d4", guideColor: "#2463d4" },
+export const PROMPTER_PALETTES: Record<PrompterTheme, { textColor: string; bgColor: string; cueColor: string; highlightColor: string; guideColor: string; outlineColor: string }> = {
+  dark: { textColor: "#f4f5ff", bgColor: "#050d2e", cueColor: "#e9b75f", highlightColor: "#2f6fe8", guideColor: "#7fa8ff", outlineColor: "#000000" },
+  light: { textColor: "#16213a", bgColor: "#f6f8fd", cueColor: "#a86a00", highlightColor: "#2463d4", guideColor: "#2463d4", outlineColor: "#ffffff" },
 };
 
 export interface Settings {
@@ -74,6 +74,7 @@ export interface Settings {
   uppercase: boolean;
   marginX: number; // % of width on each side
   textOutline: boolean;
+  outlineColor: string;
 
   // Colours
   prompterTheme: PrompterTheme;
@@ -119,7 +120,8 @@ export interface Settings {
   hideFromTaskbar: boolean;
 
   // One-time tips (not shown in settings)
-  seenPrompterTip: boolean;
+  /** How many of the prompter's first-run tips have been seen (moving it, Click Through, reading guide). */
+  prompterTipsSeen: number;
   seenTrayTip: boolean;
 
   hotkeys: Record<Action, string>;
@@ -137,19 +139,21 @@ export const DEFAULT_SETTINGS: Settings = {
   uppercase: false,
   marginX: 6,
   textOutline: true,
+  outlineColor: "#ffffff",
 
-  prompterTheme: "dark",
-  textColor: "#f4f5ff",
-  bgColor: "#050d2e",
+  // New installs start with the light prompter.
+  prompterTheme: "light",
+  textColor: "#16213a",
+  bgColor: "#f6f8fd",
   bgOpacity: 78,
-  cueColor: "#e9b75f",
-  highlightColor: "#2f6fe8",
+  cueColor: "#a86a00",
+  highlightColor: "#2463d4",
   readOpacity: 45,
 
   guideEnabled: true,
   guidePosition: 30,
   guideStyle: "arrows",
-  guideColor: "#7fa8ff",
+  guideColor: "#2463d4",
   fadeEdges: true,
 
   mode: "manual",
@@ -174,7 +178,7 @@ export const DEFAULT_SETTINGS: Settings = {
   allowScreenshots: false,
   hideFromTaskbar: true,
 
-  seenPrompterTip: false,
+  prompterTipsSeen: 0,
   seenTrayTip: false,
 
   hotkeys: { ...DEFAULT_HOTKEYS },
@@ -212,7 +216,8 @@ function migrate(settings: Settings, raw: Record<string, unknown>, from: number)
   const out = settings as unknown as Record<string, unknown>;
   if (from < 2) {
     for (const [key, oldValue] of Object.entries(OLD_DEFAULT_COLORS)) {
-      if (String(out[key]).toLowerCase() === oldValue) out[key] = DEFAULT_SETTINGS[key as keyof Settings];
+      // 1.x was always dark, so its old default colours become the dark palette's.
+      if (String(out[key]).toLowerCase() === oldValue) out[key] = PROMPTER_PALETTES.dark[key as keyof (typeof PROMPTER_PALETTES)["dark"]];
     }
     // 1.x only had "show the prompter in the taskbar". It's replaced by one setting for both windows.
     delete out.showInTaskbar;
@@ -232,6 +237,14 @@ export function normalizeData(raw: unknown, fallback: () => AppData): AppData {
   };
   const from = typeof d.version === "number" ? d.version : 1;
   migrate(settings, savedSettings as Record<string, unknown>, from);
+  // The prompter used to start dark. Saves from before the light/dark switch stay dark, matching their colours.
+  if (Object.keys(savedSettings).length && savedSettings.prompterTheme === undefined) settings.prompterTheme = "dark";
+  // Saves from before the outline colour setting: dark used a black outline, light a white one.
+  if (savedSettings.outlineColor === undefined) settings.outlineColor = PROMPTER_PALETTES[settings.prompterTheme].outlineColor;
+  // Before there were three prompter tips there was one, the moving tip. Seen it: carry on from the second.
+  const rawSettings = savedSettings as Record<string, unknown>;
+  if (rawSettings.prompterTipsSeen === undefined && rawSettings.seenPrompterTip === true) settings.prompterTipsSeen = 1;
+  delete (settings as unknown as Record<string, unknown>).seenPrompterTip;
   const scripts = Array.isArray(d.scripts) ? d.scripts.filter((s) => s && typeof s.id === "string") : [];
   if (scripts.length === 0) return { ...fallback(), settings };
   const activeScriptId =

@@ -1,6 +1,3 @@
-import "@fontsource/fredoka/latin-500.css";
-import "@fontsource/fredoka/latin-600.css";
-
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { PhysicalPosition, Window, primaryMonitor } from "@tauri-apps/api/window";
@@ -10,7 +7,7 @@ import { importFile } from "../shared/importers";
 import { renderSections, shortcutSections } from "../shared/shortcuts";
 import { creditHtml, initSplash, splashHtml } from "./splash";
 import { initTheme } from "./theme";
-import { countWords } from "../shared/markup";
+import { countWords, renderScript } from "../shared/markup";
 import { WELCOME_SCRIPT, WELCOME_TITLE } from "../shared/sample";
 import {
   ACTION_LABELS,
@@ -52,13 +49,23 @@ function save() {
 async function saveNow() {
   clearTimeout(saveTimer);
   try {
-    await invoke("save_data", { json: JSON.stringify(data) });
+    // While Settings has unsaved changes, the file keeps the last saved settings.
+    const toWrite = settingsBase ? { ...data, settings: settingsBase } : data;
+    await invoke("save_data", { json: JSON.stringify(toWrite) });
     showBanner(null);
-    $("saved").textContent = "Saved";
+    setSaveStatus("saved");
   } catch (e) {
     showBanner(`Couldn't save your latest changes: ${e}`);
   }
 }
+
+/**
+ * Settings as last saved, while the Settings drawer is open (null when it's closed).
+ * Changes in the drawer preview right away but only reach the file when Save is pressed.
+ */
+let settingsBase: Settings | null = null;
+const stableJson = (s: Settings) => JSON.stringify(s, [...new Set([...Object.keys(s), ...Object.keys(s.hotkeys)])].sort());
+const settingsDirty = () => !!settingsBase && stableJson(settingsBase) !== stableJson(S());
 
 let settingsQueued = false;
 function pushSettings() {
@@ -126,8 +133,15 @@ const ICONS = {
   voice: icon('<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>'),
   follow: icon('<path d="M4 12h.01M7.5 9v6M11 5.5v13M14.5 8v8M18 10.5v3M21 12h.01"/>'),
   check: icon('<path d="m6 12.5 4 4 8-9"/>'),
+  close: icon('<path d="M6 6l12 12M18 6 6 18"/>'),
   eyeOff: icon('<path d="M3 3l18 18"/><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c5 0 8.5 4 9.5 6a14 14 0 0 1-2.9 3.6M6.4 7.6A14 14 0 0 0 2.5 12c1 2 4.5 6 9.5 6 1.4 0 2.6-.3 3.7-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
+  eye: icon('<path d="M2.5 12c1-2 4.5-6 9.5-6s8.5 4 9.5 6c-1 2-4.5 6-9.5 6s-8.5-4-9.5-6z"/><circle cx="12" cy="12" r="3"/>'),
+  pencil: icon('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'),
   pin: icon('<path d="M9 4h6l-1 5 3 3v1.5H7V12l3-3z"/><path d="M12 13.5V20"/>'),
+  toStart: icon('<path d="M6 5v14M18 6l-8 6 8 6z"/>'),
+  lineUp: icon('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+  lineDown: icon('<path d="M12 5v14M6 13l6 6 6-6"/>'),
+  copy: icon('<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>'),
   tray: icon('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 14h5l1 2h5l1-2h5"/>'),
 };
 
@@ -146,7 +160,7 @@ document.getElementById("app")!.innerHTML = `
     <aside class="scripts" aria-label="Scripts">
       <div class="brand">
         <img src="${logoUrl}" alt="Ghost In The Script logo" />
-        <div class="name">Ghost In The Script<small>A little less seen. A lot more confident.</small></div>
+        <div class="name">Ghost In<br />The Script</div>
       </div>
       <nav class="nav" aria-label="Main">
         <button aria-current="page" id="nav-scripts">${ICONS.scripts}<span>Scripts</span></button>
@@ -156,26 +170,26 @@ document.getElementById("app")!.innerHTML = `
         <button id="nav-about">${ICONS.about}<span>About</span></button>
       </nav>
       <div class="scripts-actions">
-        <button class="btn primary" id="btn-new">${ICONS.plus}<span>New script</span></button>
-        <button class="btn quiet" id="btn-import">${ICONS.upload}<span>Import file</span></button>
+        <button class="btn primary" id="btn-new">${ICONS.plus}<span>New Script</span></button>
+        <button class="btn quiet" id="btn-import">${ICONS.upload}<span>Import File</span></button>
       </div>
       <div class="list-head" id="list-head">SCRIPTS</div>
       <div class="search-wrap">
         ${ICONS.search}
-        <input class="search" id="search" type="search" placeholder="Search scripts..." aria-label="Search scripts" />
+        <input class="search" id="search" type="search" placeholder="Search Scripts..." aria-label="Search scripts" />
       </div>
       <ul class="script-list" id="list"></ul>
       <div class="list-empty" id="list-empty" hidden>
         <p id="list-empty-text"></p>
-        <button class="btn small" id="btn-clear-search">Clear search</button>
+        <button class="btn small" id="btn-clear-search">Clear Search</button>
       </div>
       <input type="file" id="file" accept=".txt,.md,.markdown,.docx,.rtf" multiple hidden />
       <div class="side-foot">
         ${creditHtml()}
         <div class="side-row">
-          <span class="version">v1.5.1</span>
+          <span class="version">v1.5.2</span>
           <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
-            ${ICONS.moon}<span id="theme-label">Light mode</span><span class="theme-track" aria-hidden="true"><span></span></span>
+            ${ICONS.moon}<span id="theme-label">Light Mode</span><span class="theme-track" aria-hidden="true"><span></span></span>
           </button>
         </div>
       </div>
@@ -184,7 +198,7 @@ document.getElementById("app")!.innerHTML = `
     <main class="write" aria-label="Script editor">
       <div class="banner" id="save-error" role="alert" hidden>
         <span id="save-error-text"></span>
-        <button class="btn small" id="btn-retry-save">Try again</button>
+        <button class="btn small" id="btn-retry-save">Try Again</button>
       </div>
       <div class="write-head">
         <span class="file-tile" aria-hidden="true">${ICONS.scripts}</span>
@@ -193,8 +207,8 @@ document.getElementById("app")!.innerHTML = `
           <span class="write-meta"><b id="wc">0</b> words <i aria-hidden="true">&bull;</i> About <b id="dur">0:00</b> at a normal speaking pace</span>
         </div>
         <div class="write-actions">
-          <button class="btn small" id="btn-dup">Duplicate</button>
-          <button class="btn small" id="btn-export">Save as .txt</button>
+          <button class="icon-btn" id="btn-dup" title="Duplicate this script" aria-label="Duplicate this script">${ICONS.copy}</button>
+          <button class="btn small" id="btn-export" title="Save as a .txt file">Save As</button>
           <button class="btn small danger" id="btn-del">Delete</button>
         </div>
       </div>
@@ -204,11 +218,11 @@ document.getElementById("app")!.innerHTML = `
         <button class="btn" data-wrap="__" title="Underline (Ctrl+U)" aria-label="Underline"><u>U</u></button>
         <button class="btn" data-wrap="==" title="Highlight (Ctrl+H)">Highlight</button>
         <span class="divider"></span>
-        <button class="btn" id="btn-cue" title="A note to yourself. Shown in gold, skipped by voice tracking.">Add cue</button>
+        <button class="btn" id="btn-cue" title="A note to yourself. Shown in gold, skipped by voice tracking.">Add Cue</button>
         <span class="color-pick" title="Colour the selected words"><input type="color" id="fmt-color" value="#e9b75f" aria-label="Colour the selected words" /></span>
         <span class="divider"></span>
-        <button class="btn quiet" id="btn-help" aria-expanded="false" aria-controls="help-pop">Formatting help</button>
-        <div class="help-pop" id="help-pop" role="dialog" aria-label="Formatting help" hidden>
+        <button class="btn quiet" id="btn-help" aria-expanded="false" aria-controls="help-pop">Formatting Help</button>
+        <div class="help-pop" id="help-pop" role="dialog" aria-label="Formatting Help" hidden>
           <h3>Formatting</h3>
           <dl>
             <dt>**bold**</dt><dd><b>bold</b></dd>
@@ -218,47 +232,48 @@ document.getElementById("app")!.innerHTML = `
             <dt>[note]</dt><dd><span class="cue-sample">a cue for you</span>, not read by voice tracking</dd>
             <dt>{red}words{/}</dt><dd>any colour name or #hex</dd>
             <dt>blank line</dt><dd>new paragraph</dd>
+            <dt>\\*  \\_  \\=</dt><dd>the character itself, not a mark</dd>
           </dl>
         </div>
       </div>
       <div class="editor-wrap">
         <textarea class="script" id="body" spellcheck="true" aria-label="Script text"
           placeholder="Paste or type your script here.&#10;&#10;Or drop a .txt, .md or .docx file onto this window."></textarea>
-        <div class="drop-hint" id="drop" hidden>Drop to import</div>
+        <div class="script-preview" id="preview" tabindex="0" aria-label="Formatted preview of the script" hidden></div>
+        <div class="drop-hint" id="drop" hidden>Drop to Import</div>
       </div>
       <div class="write-foot">
-        <span><b id="wc2">0</b> words</span>
-        <span>About <b id="dur2">0:00</b> at a normal speaking pace</span>
         <span class="saved" id="saved"></span>
+        <button class="preview-toggle" id="btn-preview" aria-pressed="false" aria-label="Preview: see the script formatted, the way the prompter shows it" title="Preview: see the script formatted, the way the prompter shows it">${ICONS.eye}</button>
       </div>
     </main>
 
     <aside class="present" aria-label="Present">
       <div class="present-body">
-        <button class="start" id="start"><span class="start-main" id="start-main">${PLAY}<span>Start prompting</span></span><kbd class="start-keys" id="start-keys" hidden></kbd></button>
-        <p class="start-hint"><span id="start-hint"></span> <button class="link" id="btn-shortcuts">Keyboard shortcuts and gestures (Ctrl+/)</button></p>
+        <button class="start" id="start"><span class="start-main" id="start-main">${PLAY}<span>Start Prompting</span></span></button>
+        <p class="start-hint"><span id="start-hint"></span> <button class="link" id="btn-shortcuts">Keyboard Shortcuts and Gestures (Ctrl+/)</button></p>
 
         <div class="notices" id="notices" aria-live="polite"></div>
 
         <div class="progress">
-          <button class="bar" id="bar" aria-label="Jump to a point in the script" title="Click to jump to that point in the script"><span class="fill" id="fill"></span></button>
+          <button class="bar" id="bar" aria-label="Jump to a point in the script" title="Click to jump to that point in the script"><span class="fill gs-fill" id="fill"></span><span class="p-head" aria-hidden="true"></span></button>
           <div class="meta"><span id="elapsed">0:00</span><span id="wpm"></span><span id="remaining">-0:00</span></div>
         </div>
         <div class="nav-row">
-          <button class="btn small" id="t-rewind">To start</button>
-          <button class="btn small" id="t-back">Line up</button>
-          <button class="btn small" id="t-fwd">Line down</button>
+          <button class="btn small nav-btn" id="t-rewind">${ICONS.toStart}<span>To Start</span></button>
+          <button class="btn small nav-btn" id="t-back">${ICONS.lineUp}<span>Line Up</span></button>
+          <button class="btn small nav-btn" id="t-fwd">${ICONS.lineDown}<span>Line Down</span></button>
         </div>
 
         <section>
-          <h2 class="group-title" id="modes-title">Scrolling mode</h2>
+          <h2 class="group-title" id="modes-title">Scrolling Mode</h2>
           <fieldset class="modes" id="modes" aria-labelledby="modes-title">
             ${(["manual", "voice", "follow"] as ScrollMode[]).map((m) => `
               <label class="mode">
                 <input type="radio" name="mode" value="${m}" />
                 <span class="tick" aria-hidden="true">${ICONS.check}</span>
                 <span class="mode-icon" aria-hidden="true">${ICONS[m]}</span>
-                <b>${MODE_LABELS[m]}</b>
+                <b>${m === "manual" ? MODE_LABELS[m].replace(" ", "<br>") : MODE_LABELS[m]}</b>
                 <small>${MODE_SHORT[m]}</small>
               </label>`).join("")}
           </fieldset>
@@ -267,23 +282,22 @@ document.getElementById("app")!.innerHTML = `
         <div class="voice-box" id="voice-box" hidden>
           <div class="meter" aria-hidden="true" title="Your microphone level. The gold mark is how loud you need to be for it to count as talking."><div class="fill" id="p-meter"></div><div class="mark" id="p-mark"></div></div>
           <div class="heard" id="heard" role="status"></div>
-          <button class="link" id="btn-sensitivity">Adjust sensitivity</button>
+          <button class="link" id="btn-sensitivity">Adjust Sensitivity</button>
         </div>
 
         <div class="quick" id="quick"></div>
 
         <div class="panel-actions">
-          <button class="btn primary" id="btn-prompter">${ICONS.pin}<span id="btn-prompter-label">Show prompter</span></button>
-          <button class="btn" id="btn-tray">${ICONS.tray}<span>Minimise to tray</span></button>
+          <button class="btn primary" id="btn-prompter">${ICONS.pin}<span id="btn-prompter-label">Show Prompter</span></button>
+          <button class="btn" id="btn-tray">${ICONS.tray}<span>Minimise to Tray</span></button>
         </div>
 
         <section class="rec-card">
           <div class="rec-head">
             <span class="rec-icon" aria-hidden="true">${ICONS.eyeOff}</span>
-            <b>Recording protection</b>
+            <b>Recording Protection</b>
             <span class="switch rec-switch"><input type="checkbox" role="switch" id="rec-switch" aria-label="Hide the prompter and this window from recordings" /><span></span></span>
           </div>
-          <button class="link" id="btn-recording">Recording settings <span aria-hidden="true">↗</span></button>
         </section>
       </div>
     </aside>
@@ -293,13 +307,15 @@ document.getElementById("app")!.innerHTML = `
     <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" id="drawer">
       <div class="drawer-head">
         <h2 id="drawer-title">Settings</h2>
-        <button class="btn quiet small" id="btn-close-settings">Close</button>
+        <button class="icon-btn close-x" id="btn-close-settings" aria-label="Close" title="Close">${ICONS.close}</button>
       </div>
       <div class="tabs" role="tablist" id="tabs"></div>
       <div id="panels" style="display:contents"></div>
       <div class="drawer-foot">
-        <small>Changes apply right away and are saved.</small>
-        <button class="btn small danger" id="btn-reset">Reset settings</button>
+        <div class="drawer-foot-actions">
+          <button class="btn small danger-fill" id="btn-reset">Reset Settings</button>
+          <button class="btn small go" id="btn-save-settings"><span class="save-label">Save</span></button>
+        </div>
       </div>
     </div>
   </div>
@@ -310,6 +326,7 @@ document.getElementById("app")!.innerHTML = `
       <p id="dialog-body"></p>
       <div class="actions">
         <button class="btn" id="dialog-cancel">Cancel</button>
+        <button class="btn" id="dialog-alt" hidden></button>
         <button class="btn primary" id="dialog-ok"></button>
       </div>
     </div>
@@ -318,9 +335,9 @@ document.getElementById("app")!.innerHTML = `
   <div class="backdrop" id="sheet-backdrop" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" id="sheet">
       <div class="sheet-head">
-        <h2 id="sheet-title">Shortcuts and gestures</h2>
-        <button class="btn small" id="btn-change-hotkeys">Change hotkeys</button>
-        <button class="btn quiet small" id="btn-close-sheet">Close</button>
+        <h2 id="sheet-title">Shortcuts and Gestures</h2>
+        <button class="btn small" id="btn-change-hotkeys">Change Hotkeys</button>
+        <button class="icon-btn close-x" id="btn-close-sheet" aria-label="Close" title="Close">${ICONS.close}</button>
       </div>
       <div class="sheet-body" id="sheet-body"></div>
     </div>
@@ -329,14 +346,12 @@ document.getElementById("app")!.innerHTML = `
   <div class="toast" id="toast" role="status" hidden></div>`;
 
 initTheme();
-document.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest("button");
-  if (!button || button.disabled || button.getAttribute("aria-disabled") === "true" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  button.animate([
-    { boxShadow: "0 0 0 0 var(--feedback)" },
-    { boxShadow: "0 0 0 5px transparent" },
-  ], { duration: 380, easing: "ease-out" });
-});
+
+// Show the focus ring only while the keyboard is being used to move around.
+const docEl = document.documentElement;
+addEventListener("keydown", (e) => { if (e.key === "Tab") docEl.classList.add("kbd"); }, true);
+addEventListener("pointerdown", () => docEl.classList.remove("kbd"), true);
+
 
 // ---------- Toast, dialog, save errors ----------
 let toastTimer: number | undefined;
@@ -349,38 +364,64 @@ function toast(msg: string, error = false) {
   toastTimer = window.setTimeout(() => (t.hidden = true), error ? 6000 : 2600);
 }
 
+/** The editor footer's save status: a spinning ring while saving, then a bold green "Saved!". */
+function setSaveStatus(state: "saving" | "saved" | "error") {
+  const el = $("saved");
+  el.className = `saved is-${state}`;
+  if (state === "saving") {
+    el.innerHTML = '<span class="saved-spin" aria-hidden="true"></span>';
+    el.title = "Saving";
+  } else {
+    el.textContent = state === "saved" ? "Saved!" : "Not saved";
+    el.removeAttribute("title");
+  }
+}
+
 function showBanner(msg: string | null) {
   $("save-error").hidden = !msg;
   if (msg) {
     $("save-error-text").textContent = msg;
-    $("saved").textContent = "Not saved";
+    setSaveStatus("error");
   }
 }
 $("btn-retry-save").onclick = () => saveNow();
 
-let dialogResolve: ((ok: boolean) => void) | null = null;
+type DialogChoice = "ok" | "alt" | "cancel";
+let dialogResolve: ((choice: DialogChoice) => void) | null = null;
 let dialogReturnFocus: HTMLElement | null = null;
-function confirmDialog(title: string, body: string, okLabel: string, danger = true): Promise<boolean> {
+/**
+ * Shows the dialog with Cancel, an optional middle button (`altLabel`) and the main button.
+ * `okClass` styles the main button, e.g. "btn primary" or "btn danger-fill".
+ */
+function choiceDialog(title: string, body: string, okLabel: string, okClass: string, altLabel?: string, altClass = "btn"): Promise<DialogChoice> {
   $("dialog-title").textContent = title;
   $("dialog-body").textContent = body;
   const ok = $("dialog-ok");
   ok.textContent = okLabel;
-  ok.className = danger ? "btn danger" : "btn primary";
+  ok.className = okClass;
+  const alt = $("dialog-alt");
+  alt.hidden = !altLabel;
+  alt.textContent = altLabel ?? "";
+  alt.className = altClass;
   dialogReturnFocus = document.activeElement as HTMLElement;
   $("dialog-backdrop").hidden = false;
   $("dialog-cancel").focus();
   return new Promise((resolve) => (dialogResolve = resolve));
 }
-function closeDialog(result: boolean) {
+function confirmDialog(title: string, body: string, okLabel: string, danger = true): Promise<boolean> {
+  return choiceDialog(title, body, okLabel, danger ? "btn danger-fill" : "btn primary").then((c) => c === "ok");
+}
+function closeDialog(choice: DialogChoice) {
   $("dialog-backdrop").hidden = true;
-  dialogResolve?.(result);
+  dialogResolve?.(choice);
   dialogResolve = null;
   dialogReturnFocus?.focus();
 }
-$("dialog-ok").onclick = () => closeDialog(true);
-$("dialog-cancel").onclick = () => closeDialog(false);
+$("dialog-ok").onclick = () => closeDialog("ok");
+$("dialog-alt").onclick = () => closeDialog("alt");
+$("dialog-cancel").onclick = () => closeDialog("cancel");
 $("dialog-backdrop").addEventListener("mousedown", (e) => {
-  if (e.target === e.currentTarget) closeDialog(false);
+  if (e.target === e.currentTarget) closeDialog("cancel");
 });
 
 // ---------- Fields ----------
@@ -394,7 +435,8 @@ type Field =
   | { type: "select"; key: keyof Settings; label: string; options: [string, string][] | (() => [string, string][]); hint?: Hint }
   | { type: "seg"; key: keyof Settings; label: string; options: [string, string][] }
   | { type: "text"; key: keyof Settings; label: string; placeholder?: string; hint?: Hint }
-  | { type: "heading"; text: string }
+  /** A titled card of related settings. */
+  | { type: "group"; title: string; fields: Field[] }
   | { type: "custom"; render: () => HTMLElement };
 
 const refreshers: (() => void)[] = [];
@@ -402,7 +444,13 @@ let fieldSeq = 0;
 
 function renderField(f: Field): HTMLElement {
   if (f.type === "custom") return f.render();
-  if (f.type === "heading") return el("h3", undefined, f.text);
+  if (f.type === "group") {
+    const section = el("section", "group");
+    const body = el("div", "group-body");
+    for (const child of f.fields) body.appendChild(renderField(child));
+    section.append(el("h3", "group-title", f.title), body);
+    return section;
+  }
   const id = `f${++fieldSeq}`;
   const wrap = el("div", "field");
   const lbl = el("div", "lbl");
@@ -515,6 +563,12 @@ function button(label: string, onClick: () => void, cls = "btn small") {
   b.onclick = onClick;
   return b;
 }
+/** A button on its own row inside a settings group. */
+function actionRow(label: string, onClick: () => void) {
+  const row = el("div", "field action");
+  row.appendChild(button(label, onClick));
+  return row;
+}
 
 // ---------- Settings content ----------
 const FONTS = [
@@ -526,101 +580,140 @@ let hotkeyProblems: HotkeyProblem[] = [];
 
 const threshold = () => 0.75 - (S().voiceSensitivity / 100) * 0.55;
 
-const fontSizeField: Field = { type: "range", key: "fontSize", label: "Text size", min: 16, max: 160, step: 1, unit: "px" };
+const fontSizeField: Field = { type: "range", key: "fontSize", label: "Text Size", min: 16, max: 160, step: 1, unit: "px" };
 const speedField: Field = { type: "range", key: "speed", label: "Speed", min: 1, max: 100, step: 1 };
 
 const TABS: { id: string; label: string; fields: Field[] }[] = [
   {
     id: "text", label: "Text",
     fields: [
-      { type: "select", key: "fontFamily", label: "Font", options: () => {
-        const list = FONTS.includes(S().fontFamily) ? FONTS : [S().fontFamily, ...FONTS];
-        return list.map((f) => [f, f] as [string, string]);
-      } },
-      fontSizeField,
-      { type: "select", key: "fontWeight", label: "Weight", options: [["300", "Light"], ["400", "Regular"], ["600", "Semibold"], ["700", "Bold"], ["900", "Black"]] },
-      { type: "range", key: "lineHeight", label: "Line spacing", min: 1, max: 3, step: 0.05, fmt: (v) => `${v.toFixed(2)}×` },
-      { type: "range", key: "paragraphSpacing", label: "Space between paragraphs", min: 0, max: 3, step: 0.1, fmt: (v) => `${v.toFixed(1)} lines` },
-      { type: "range", key: "letterSpacing", label: "Letter spacing", min: -2, max: 12, step: 0.5, unit: "px" },
-      { type: "range", key: "wordSpacing", label: "Word spacing", min: 0, max: 40, step: 1, unit: "px" },
-      { type: "range", key: "marginX", label: "Side margins", min: 0, max: 30, step: 1, unit: "%" },
-      { type: "seg", key: "textAlign", label: "Alignment", options: [["left", "Left"], ["center", "Centre"], ["right", "Right"], ["justify", "Justify"]] },
-      { type: "toggle", key: "uppercase", label: "All capitals" },
-      { type: "toggle", key: "textOutline", label: "Dark outline around letters", hint: "Keeps text readable when the background is see-through." },
+      { type: "group", title: "Font", fields: [
+        { type: "select", key: "fontFamily", label: "Font", options: () => {
+          const list = FONTS.includes(S().fontFamily) ? FONTS : [S().fontFamily, ...FONTS];
+          return list.map((f) => [f, f] as [string, string]);
+        } },
+        { type: "select", key: "fontWeight", label: "Weight", options: [["300", "Light"], ["400", "Regular"], ["600", "Semibold"], ["700", "Bold"], ["900", "Black"]] },
+        fontSizeField,
+        { type: "toggle", key: "uppercase", label: "All Capitals" },
+      ] },
+      { type: "group", title: "Layout", fields: [
+        { type: "seg", key: "textAlign", label: "Alignment", options: [["left", "Left"], ["center", "Centre"], ["right", "Right"], ["justify", "Justify"]] },
+        { type: "range", key: "marginX", label: "Side Margins", min: 0, max: 30, step: 1, unit: "%" },
+      ] },
+      { type: "group", title: "Spacing", fields: [
+        { type: "range", key: "lineHeight", label: "Line Spacing", min: 1, max: 3, step: 0.05, fmt: (v) => `${v.toFixed(2)}×` },
+        { type: "range", key: "paragraphSpacing", label: "Space Between Paragraphs", min: 0, max: 3, step: 0.1, fmt: (v) => `${v.toFixed(1)} lines` },
+        { type: "range", key: "letterSpacing", label: "Letter Spacing", min: -2, max: 12, step: 0.5, unit: "px" },
+        { type: "range", key: "wordSpacing", label: "Word Spacing", min: 0, max: 40, step: 1, unit: "px" },
+      ] },
+      { type: "group", title: "Outline", fields: [
+        { type: "toggle", key: "textOutline", label: "Outline Around Letters", hint: "Keeps text readable when the background is see-through." },
+        { type: "color", key: "outlineColor", label: "Outline Colour" },
+      ] },
     ],
   },
   {
     id: "look", label: "Colours",
     fields: [
-      { type: "seg", key: "prompterTheme", label: "Prompter theme", options: [["dark", "Dark"], ["light", "Light"]] },
-      { type: "custom", render: renderPresets },
-      { type: "color", key: "textColor", label: "Text" },
-      { type: "color", key: "bgColor", label: "Background" },
-      { type: "range", key: "bgOpacity", label: "Background opacity", min: 0, max: 100, step: 1, unit: "%", hint: "Lower it to see your slides or webcam through the prompter." },
-      { type: "color", key: "cueColor", label: "Cues [notes]" },
-      { type: "color", key: "highlightColor", label: "Highlight" },
-      { type: "range", key: "readOpacity", label: "Text you've already read", min: 5, max: 100, step: 1, unit: "%", hint: "Dims lines above the reading guide so your eye finds its place." },
-      { type: "heading", text: "Reading guide" },
-      { type: "toggle", key: "guideEnabled", label: "Show reading guide" },
-      { type: "seg", key: "guideStyle", label: "Style", options: [["arrows", "Arrows"], ["line", "Line"], ["band", "Band"]] },
-      { type: "range", key: "guidePosition", label: "Height on screen", min: 5, max: 90, step: 1, unit: "% from top", hint: "Near the top keeps your eyes close to the webcam." },
-      { type: "color", key: "guideColor", label: "Guide colour" },
-      { type: "toggle", key: "fadeEdges", label: "Fade text at the top and bottom" },
+      { type: "group", title: "Quick Colour Sets", fields: [{ type: "custom", render: renderPresets }] },
+      { type: "group", title: "Colours", fields: [
+        { type: "color", key: "textColor", label: "Text" },
+        { type: "color", key: "bgColor", label: "Background" },
+        { type: "color", key: "cueColor", label: "Cues [Notes]" },
+        { type: "color", key: "highlightColor", label: "Highlight" },
+      ] },
+      { type: "group", title: "Transparency", fields: [
+        { type: "range", key: "bgOpacity", label: "Background Opacity", min: 0, max: 100, step: 1, unit: "%", hint: "Lower it to see your slides or webcam through the prompter." },
+        { type: "range", key: "readOpacity", label: "Text You've Already Read", min: 5, max: 100, step: 1, unit: "%", hint: "Dims lines above the reading guide so your eye finds its place." },
+        { type: "toggle", key: "fadeEdges", label: "Fade Text at the Top and Bottom" },
+      ] },
+      { type: "group", title: "Reading Guide", fields: [
+        { type: "toggle", key: "guideEnabled", label: "Show Reading Guide" },
+        { type: "seg", key: "guideStyle", label: "Style", options: [["arrows", "Arrows"], ["line", "Line"], ["band", "Band"]] },
+        { type: "range", key: "guidePosition", label: "Height on Screen", min: 5, max: 90, step: 1, unit: "% from top", hint: "Near the top keeps your eyes close to the webcam." },
+        { type: "color", key: "guideColor", label: "Guide Colour" },
+      ] },
     ],
   },
   {
     id: "voice", label: "Voice",
     fields: [
       { type: "custom", render: () => note("Speech recognition runs on this PC. Nothing you say leaves it.") },
-      { type: "select", key: "micDevice", label: "Microphone", options: () => [["", "Windows default"], ...micDevices.map((d) => [d, d] as [string, string])] },
-      { type: "custom", render: renderMicTools },
-      { type: "range", key: "voiceSensitivity", label: "Sensitivity", min: 0, max: 100, step: 1, unit: "%", hint: "Raise it if quiet speech doesn't scroll. Lower it if background noise does. The gold mark on the level meter is the trigger point." },
-      { type: "range", key: "silenceHold", label: "Keep scrolling after you stop", min: 100, max: 3000, step: 50, fmt: (v) => `${(v / 1000).toFixed(2)} s` },
-      { type: "range", key: "followSmoothing", label: "Follow mode smoothness", min: 1, max: 10, step: 1, hint: "Higher glides more, lower reacts faster." },
-      { type: "toggle", key: "restrictVocabulary", label: "Only listen for words in the script", hint: "Much more accurate. Turn it off if you ad-lib a lot." },
-      { type: "text", key: "modelPath", label: "Speech model folder (optional)", placeholder: "Built-in English model", hint: "For another language or better accuracy, download a Vosk model from alphacephei.com/vosk/models, unzip it, and paste the folder path here." },
+      { type: "group", title: "Microphone", fields: [
+        { type: "select", key: "micDevice", label: "Microphone", options: () => [["", "Windows default"], ...micDevices.map((d) => [d, d] as [string, string])] },
+        { type: "custom", render: renderMicTools },
+        { type: "range", key: "voiceSensitivity", label: "Sensitivity", min: 0, max: 100, step: 1, unit: "%", hint: "Raise it if quiet speech doesn't scroll. Lower it if background noise does. The gold mark on the level meter is the trigger point." },
+      ] },
+      { type: "group", title: "Voice Activated", fields: [
+        { type: "range", key: "silenceHold", label: "Keep Scrolling After You Stop", min: 100, max: 3000, step: 50, fmt: (v) => `${(v / 1000).toFixed(2)} s` },
+      ] },
+      { type: "group", title: "Follow My Voice", fields: [
+        { type: "range", key: "followSmoothing", label: "Follow Mode Smoothness", min: 1, max: 10, step: 1, hint: "Higher glides more, lower reacts faster." },
+        { type: "toggle", key: "restrictVocabulary", label: "Only Listen for Words in the Script", hint: "Much more accurate. Turn it off if you ad-lib a lot." },
+        { type: "text", key: "modelPath", label: "Speech Model Folder (Optional)", placeholder: "Built-in English model", hint: "For another language or better accuracy, download a Vosk model from alphacephei.com/vosk/models, unzip it, and paste the folder path here." },
+      ] },
     ],
   },
   {
     id: "window", label: "Window",
     fields: [
-      { type: "toggle", key: "hidePrompterFromCapture", label: "Hide the prompter from recordings", hint: "Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing see through it." },
-      { type: "toggle", key: "hideControlsFromCapture", label: "Hide this window from recordings" },
-      { type: "toggle", key: "allowScreenshots", label: "Allow screenshots", hint: () => {
-        const k = keysFor("screenshot");
-        return `Shows the prompter and this window to Print Screen and Snipping Tool. Windows can't allow screenshots without also allowing recordings, so turn it off before you record.${k ? ` ${k} flips it from any app.` : ""}`;
-      } },
-      { type: "toggle", key: "alwaysOnTop", label: "Keep the prompter on top" },
-      { type: "toggle", key: "clickThrough", label: "Clicks pass through the prompter", hint: () => {
-        const k = keysFor("toggle-click-through");
-        return `Lets you click the app underneath. Turn it off with this switch${k ? `, ${k}` : ""} or the tray menu.`;
-      } },
-      { type: "toggle", key: "hideFromTaskbar", label: "Hide from the taskbar", hint: () => {
-        const k = keysFor("toggle-controls");
-        return `Your recording won't show a ghost button in the taskbar. Open the app from the ghost in the tray, near the clock${k ? `, or with ${k}` : ""}. Minimising sends this window to the tray.`;
-      } },
-      { type: "toggle", key: "mirrorH", label: "Mirror left to right", hint: "For teleprompter glass." },
-      { type: "toggle", key: "mirrorV", label: "Flip upside down" },
-      { type: "custom", render: () => button("Move the prompter under the webcam", centerPrompter) },
-      { type: "heading", text: "While prompting" },
-      { type: "range", key: "countdown", label: "Countdown before scrolling", min: 0, max: 10, step: 1, fmt: (v) => (v ? `${v} s` : "Off") },
-      { type: "toggle", key: "showProgress", label: "Progress line on the prompter" },
-      { type: "toggle", key: "showTimer", label: "Time elapsed and left on the prompter" },
+      { type: "group", title: "Recording", fields: [
+        { type: "toggle", key: "hidePrompterFromCapture", label: "Hide the Prompter from Recordings", hint: "Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing see through it." },
+        { type: "toggle", key: "hideControlsFromCapture", label: "Hide This Window from Recordings" },
+        { type: "toggle", key: "allowScreenshots", label: "Allow Screenshots", hint: () => {
+          const k = keysFor("screenshot");
+          return `Shows the prompter and this window to Print Screen and Snipping Tool. Windows can't allow screenshots without also allowing recordings, so turn it off before you record.${k ? ` ${k} flips it from any app.` : ""}`;
+        } },
+        { type: "toggle", key: "hideFromTaskbar", label: "Hide from the Taskbar", hint: () => {
+          const k = keysFor("toggle-controls");
+          return `Your recording won't show a ghost button in the taskbar. Open the app from the ghost in the tray, near the clock${k ? `, or with ${k}` : ""}. Minimising sends this window to the tray.`;
+        } },
+      ] },
+      { type: "group", title: "Prompter Window", fields: [
+        { type: "toggle", key: "alwaysOnTop", label: "Keep the Prompter on Top" },
+        { type: "toggle", key: "clickThrough", label: "Clicks Pass Through the Prompter", hint: () => {
+          const k = keysFor("toggle-click-through");
+          return `Lets you click the app underneath. Turn it off with this switch${k ? `, ${k}` : ""} or the tray menu.`;
+        } },
+        { type: "toggle", key: "mirrorH", label: "Mirror Left to Right", hint: "For teleprompter glass." },
+        { type: "toggle", key: "mirrorV", label: "Flip Upside Down" },
+        { type: "custom", render: () => actionRow("Move the Prompter Under the Webcam", centerPrompter) },
+      ] },
+      { type: "group", title: "While Prompting", fields: [
+        { type: "range", key: "countdown", label: "Countdown Before Scrolling", min: 0, max: 10, step: 1, fmt: (v) => (v ? `${v} s` : "Off") },
+        { type: "toggle", key: "showProgress", label: "Progress Line on the Prompter" },
+        { type: "toggle", key: "showTimer", label: "Time Elapsed and Left on the Prompter" },
+      ] },
     ],
   },
-  { id: "hotkeys", label: "Hotkeys", fields: [{ type: "custom", render: renderHotkeys }] },
+  {
+    id: "hotkeys", label: "Hotkeys",
+    fields: [
+      { type: "custom", render: () => note("These work from <b>any app</b>, even while Panopto is recording. Select a box, then press the new keys. Backspace removes a hotkey. Escape cancels.") },
+      { type: "group", title: "From Any App", fields: [
+        { type: "custom", render: renderHotkeys },
+        { type: "custom", render: () => actionRow("Restore Default Hotkeys", restoreDefaultHotkeys) },
+      ] },
+    ],
+  },
 ];
 
 function renderPresets(): HTMLElement {
-  const presets: { name: string; text: string; bg: string; opacity?: number }[] = [
-    { name: "Night sky", text: "#f4f5ff", bg: "#050d2e" },
-    { name: "Gold on black", text: "#ffd27a", bg: "#000000" },
-    { name: "Ink on paper", text: "#111a3a", bg: "#f4f1ea", opacity: 92 },
-    { name: "White on black", text: "#ffffff", bg: "#000000" },
+  const presets: { name: string; text: string; bg: string; outline: string; opacity?: number }[] = [
+    { name: "Night sky", text: "#f4f5ff", bg: "#050d2e", outline: "#000000" },
+    { name: "Gold on black", text: "#ffd27a", bg: "#000000", outline: "#000000" },
+    { name: "Ink on paper", text: "#111a3a", bg: "#f4f1ea", outline: "#ffffff", opacity: 92 },
+    { name: "White on black", text: "#ffffff", bg: "#000000", outline: "#000000" },
+    { name: "Yellow on blue", text: "#ffe14d", bg: "#0b2a6f", outline: "#000000" },
+    { name: "Black on yellow", text: "#111111", bg: "#ffe14d", outline: "#ffffff", opacity: 92 },
+    { name: "Mint on charcoal", text: "#a8f0d0", bg: "#1e2326", outline: "#000000" },
+    { name: "Rose on plum", text: "#ffd6e7", bg: "#2a0f2e", outline: "#000000" },
   ];
+  // The group's title names this row, so there's no separate label here.
   const wrap = el("div", "field");
-  wrap.appendChild(Object.assign(el("div", "lbl"), { innerHTML: "<span>Quick colour sets</span>" }));
   const grid = el("div", "presets");
+  grid.setAttribute("role", "group");
+  grid.setAttribute("aria-label", "Quick Colour Sets");
   for (const p of presets) {
     const b = el("button", "preset", "Aa");
     b.style.background = p.bg;
@@ -628,7 +721,7 @@ function renderPresets(): HTMLElement {
     b.title = p.name;
     b.setAttribute("aria-label", `Colour set: ${p.name}`);
     b.onclick = () => {
-      data.settings = { ...S(), textColor: p.text, bgColor: p.bg, ...(p.opacity ? { bgOpacity: p.opacity } : {}) };
+      data.settings = { ...S(), textColor: p.text, bgColor: p.bg, outlineColor: p.outline, ...(p.opacity ? { bgOpacity: p.opacity } : {}) };
       save();
       pushSettings();
       refreshFields();
@@ -645,14 +738,14 @@ let drawerMark: HTMLElement | null = null;
 function renderMicTools(): HTMLElement {
   const wrap = el("div", "field");
   const lbl = el("div", "lbl");
-  lbl.append(el("span", undefined, "Input level"));
+  lbl.append(el("span", undefined, "Input Level"));
   const state = el("span", "val");
   lbl.append(state);
   const meter = el("div", "meter");
   drawerMeter = el("div", "fill");
   drawerMark = el("div", "mark");
   meter.append(drawerMeter, drawerMark);
-  wrap.append(lbl, meter, button("Refresh microphone list", () => loadDevices(true)));
+  wrap.append(lbl, meter, button("Refresh Microphone List", () => loadDevices(true)));
   refreshers.push(() => {
     state.textContent = status?.voice.running ? status.voice.device : "Off until you pick a voice mode";
     drawerMark!.style.left = `${threshold() * 100}%`;
@@ -685,9 +778,15 @@ function comboFromEvent(e: KeyboardEvent): string | null {
   return parts.join("+");
 }
 
+function restoreDefaultHotkeys() {
+  data.settings = { ...S(), hotkeys: { ...DEFAULT_HOTKEYS } };
+  save();
+  applyHotkeys();
+  toast("Default hotkeys restored");
+}
+
 function renderHotkeys(): HTMLElement {
   const wrap = el("div", "field");
-  wrap.appendChild(note("These work from <b>any app</b>, even while Panopto is recording. Select a box, then press the new keys. Backspace removes a hotkey. Escape cancels."));
   const grid = el("div", "hk");
   for (const action of Object.keys(ACTION_LABELS) as Action[]) {
     const id = `hk-${action}`;
@@ -730,12 +829,7 @@ function renderHotkeys(): HTMLElement {
   }
   const problems = el("div", "problems");
   problems.setAttribute("role", "alert");
-  wrap.append(grid, problems, button("Restore default hotkeys", () => {
-    data.settings = { ...S(), hotkeys: { ...DEFAULT_HOTKEYS } };
-    save();
-    applyHotkeys();
-    toast("Default hotkeys restored");
-  }));
+  wrap.append(grid, problems);
   refreshers.push(() => {
     problems.textContent = hotkeyProblems
       .map((p) => `${p.keys} (${ACTION_LABELS[p.action as Action] ?? p.action}) can't be used: ${p.message}. Another app may already own these keys.`)
@@ -777,7 +871,20 @@ function buildSettings() {
   selectTab("text");
 }
 
+/** Highlights one sidebar item in blue: Scripts normally, or whatever is open over the scripts. */
+function setNav(id: string) {
+  document.querySelectorAll<HTMLButtonElement>(".nav button").forEach((b) => {
+    if (b.id === id) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  });
+}
+/** The sidebar item for each Settings tab; other tabs belong to Settings itself. */
+const NAV_FOR_TAB: Record<string, string> = { hotkeys: "nav-hotkeys", look: "nav-appearance" };
+let currentTab = "text";
+
 function selectTab(id: string) {
+  currentTab = id;
+  if (!$("drawer-backdrop").hidden) setNav(NAV_FOR_TAB[id] ?? "btn-settings");
   for (const t of TABS) {
     const on = t.id === id;
     $(`tab-${t.id}`).setAttribute("aria-selected", String(on));
@@ -789,30 +896,61 @@ function selectTab(id: string) {
 let drawerReturnFocus: HTMLElement | null = null;
 function openSettings(tab?: string) {
   if (tab) selectTab(tab);
+  if (!settingsBase) settingsBase = structuredClone(S());
   drawerReturnFocus = document.activeElement as HTMLElement;
   $("drawer-backdrop").hidden = false;
+  setNav(NAV_FOR_TAB[currentTab] ?? "btn-settings");
   refreshFields();
   $("btn-close-settings").focus();
 }
-function closeSettings() {
+async function closeSettings() {
+  if (settingsDirty()) {
+    const ok = await confirmDialog("Discard unsaved changes?", "Your settings go back to how they were when you last pressed Save.", "Discard Changes");
+    if (!ok) return;
+    revertSettings();
+  }
+  settingsBase = null;
   $("drawer-backdrop").hidden = true;
+  setNav("nav-scripts");
   drawerReturnFocus?.focus();
 }
+function revertSettings() {
+  if (!settingsBase) return;
+  data.settings = structuredClone(settingsBase);
+  pushSettings();
+  applyCapture();
+  applyTaskbar();
+  applyHotkeys();
+  refreshFields();
+}
+function updateSaveState() {
+  const dirty = settingsDirty();
+  $("btn-save-settings").classList.toggle("pending", dirty);
+  $("btn-save-settings").title = dirty ? "You have unsaved changes" : "";
+}
+$("btn-save-settings").onclick = async () => {
+  if (!settingsBase) return;
+  const wasDirty = settingsDirty();
+  settingsBase = structuredClone(S());
+  await saveNow();
+  updateSaveState();
+  toast(wasDirty ? "Settings saved" : "No changes to save");
+};
 $("btn-settings").onclick = () => openSettings();
 $("btn-close-settings").onclick = closeSettings;
 $("drawer-backdrop").addEventListener("mousedown", (e) => {
   if (e.target === e.currentTarget) closeSettings();
 });
 $("btn-reset").onclick = async () => {
-  const ok = await confirmDialog("Reset all settings?", "Text, colours, voice, window and hotkey settings go back to their defaults. Your scripts are kept.", "Reset settings");
+  const ok = await confirmDialog("Reset all settings?", "Text, colours, voice, window and hotkey settings go back to their defaults. Your scripts are kept. Press Save afterwards to keep the defaults.", "Reset Settings");
   if (!ok) return;
   data.settings = { ...DEFAULT_SETTINGS, hotkeys: { ...DEFAULT_HOTKEYS } };
-  save();
   pushSettings();
   applyCapture();
   applyTaskbar();
   applyHotkeys();
-  toast("Settings reset");
+  refreshFields();
+  toast("Defaults loaded. Press Save to keep them.");
 };
 
 /** Keeps Tab inside an open drawer or dialog. */
@@ -829,7 +967,7 @@ function trapFocus(container: HTMLElement, e: KeyboardEvent) {
 document.addEventListener("keydown", (e) => {
   if (!$("splash").hidden) return;
   if (!$("dialog-backdrop").hidden) {
-    if (e.key === "Escape") closeDialog(false);
+    if (e.key === "Escape") closeDialog("cancel");
     else if (e.key === "Tab") trapFocus($("dialog-backdrop"), e);
     return;
   }
@@ -885,12 +1023,13 @@ interface Notice {
   kind: "warn" | "info";
   text: string;
   action?: { label: string; run: () => void };
-  /** What the cross does besides hiding the message for now (e.g. remember it was read). */
+  /** Runs when the message times out, besides hiding it for now (e.g. remember it was read). */
   onClose?: () => void;
 }
 let splashDone = false;
+/** The prompter has been shown at some point this session. */
+let prompterOpened = false;
 const dismissedNotices = new Set<string>();
-let noticeSig = "";
 
 const keysFor = (a: Action) => S().hotkeys[a]?.replace(/\+/g, " + ") ?? "";
 
@@ -903,7 +1042,7 @@ function currentNotices(): Notice[] {
       id: "click-through",
       kind: "warn",
       text: `Click-through is on: clicks go to the app under the prompter.${k ? ` ${k} turns it off from any app.` : ""}`,
-      action: { label: "Turn off", run: () => set("clickThrough", false) },
+      action: { label: "Turn Off", run: () => set("clickThrough", false) },
     });
   }
   if (hotkeyProblems.length) {
@@ -918,7 +1057,8 @@ function currentNotices(): Notice[] {
       action: { label: "Change", run: () => openSettings("hotkeys") },
     });
   }
-  if (splashDone && status && !status.visible) {
+  // Only once the prompter has been opened: at launch it's hidden on purpose.
+  if (splashDone && status && !status.visible && prompterOpened) {
     const k = keysFor("toggle-prompter");
     out.push({
       id: "prompter-hidden",
@@ -932,8 +1072,8 @@ function currentNotices(): Notice[] {
       id: "voice-wait",
       kind: "info",
       text: s.mode === "follow"
-        ? "Follow my voice starts when you press Start prompting. Then read aloud."
-        : "Voice scrolling starts when you press Start prompting. Then start talking.",
+        ? "Follow My Voice starts when you press Start Prompting. Then read aloud."
+        : "Voice scrolling starts when you press Start Prompting. Then start talking.",
     });
   }
   if (splashDone && s.hideFromTaskbar && !s.seenTrayTip) {
@@ -948,40 +1088,99 @@ function currentNotices(): Notice[] {
   return out;
 }
 
+/** Rows on screen, by message id, so a message that stays keeps its timer running. */
+const noticeRows = new Map<string, HTMLElement>();
+
 function renderNotices() {
+  // Messages wait until the start screen is gone, so their timers don't run out unseen.
+  if (!splashDone) return;
   const all = currentNotices();
   // A message that goes away and comes back later should show again.
   for (const id of [...dismissedNotices]) if (!all.some((n) => n.id === id)) dismissedNotices.delete(id);
   const list = all.filter((n) => !dismissedNotices.has(n.id));
-  const sig = list.map((n) => n.id + n.text).join("|");
-  if (sig === noticeSig) return;
-  noticeSig = sig;
   const host = $("notices");
-  host.textContent = "";
+  // A message whose reason has gone leaves straight away.
+  for (const [id, row] of noticeRows) {
+    if (!row.dataset.leaving && !list.some((n) => n.id === id)) {
+      row.remove();
+      noticeRows.delete(id);
+    }
+  }
+  let fresh: Notice["kind"] | null = null;
   for (const n of list) {
+    const existing = noticeRows.get(n.id);
+    if (existing) {
+      const text = existing.querySelector(".text")!;
+      if (text.textContent !== n.text) text.textContent = n.text;
+      continue;
+    }
     const row = el("div", `notice ${n.kind}`);
-    const close = el("button", "notice-close");
-    close.type = "button";
-    close.setAttribute("aria-label", "Dismiss this message");
-    close.title = "Dismiss";
-    close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-    close.onclick = () => {
-      dismissedNotices.add(n.id);
-      n.onClose?.();
-      renderNotices();
-    };
-    row.append(close, el("span", "text", n.text));
+    row.append(el("span", "text", n.text));
     if (n.action) {
       const b = el("button", "btn small", n.action.label);
       b.onclick = n.action.run;
       row.appendChild(b);
     }
+    // The bar along the bottom shrinks as the time runs out. Hovering pauses it.
+    const ms = Math.max(6000, n.text.length * 70);
+    const bar = el("span", "notice-timer");
+    bar.style.animationDuration = `${ms}ms`;
+    bar.addEventListener("animationend", () => dismissNotice(n, row));
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) setTimeout(() => dismissNotice(n, row), ms);
+    row.appendChild(bar);
     host.appendChild(row);
+    noticeRows.set(n.id, row);
+    if (fresh !== "warn") fresh = n.kind;
+  }
+  if (fresh) noticeSound(fresh);
+}
+
+function dismissNotice(n: Notice, row: HTMLElement) {
+  if (row.dataset.leaving || !row.isConnected) return;
+  row.dataset.leaving = "true";
+  dismissedNotices.add(n.id);
+  const finish = () => {
+    row.remove();
+    if (noticeRows.get(n.id) === row) noticeRows.delete(n.id);
+    n.onClose?.();
+    renderNotices();
+  };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return finish();
+  row.animate(
+    [{ opacity: 1 }, { opacity: 0 }],
+    { duration: 240, easing: "ease-in", fill: "forwards" },
+  ).onfinish = finish;
+}
+
+/** A soft two-note chime when a message pops up; lower for warnings. */
+let noticeAudio: AudioContext | null = null;
+function noticeSound(kind: Notice["kind"]) {
+  try {
+    noticeAudio ??= new AudioContext();
+    const ctx = noticeAudio;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const notes = kind === "warn" ? [660, 880] : [784, 1175];
+    notes.forEach((freq, i) => {
+      const t = ctx.currentTime + i * 0.11;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.08, t + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    });
+  } catch {
+    // No sound is fine.
   }
 }
 
 // ---------- Present panel ----------
 function buildPresent() {
+  // The same plain sliders as in Settings.
   $("quick").append(renderField(speedField), renderField(fontSizeField));
   document.querySelectorAll<HTMLInputElement>('#modes input[name="mode"]').forEach((r) => {
     r.onchange = () => r.checked && set("mode", r.value as ScrollMode);
@@ -990,17 +1189,55 @@ function buildPresent() {
     const s = S();
     document.querySelectorAll<HTMLInputElement>('#modes input[name="mode"]').forEach((r) => (r.checked = r.value === s.mode));
     $("voice-box").hidden = s.mode === "manual";
-    $<HTMLInputElement>("rec-switch").checked = s.hidePrompterFromCapture && s.hideControlsFromCapture && !s.allowScreenshots;
+    $<HTMLInputElement>("rec-switch").checked = isProtected();
     $("p-mark").style.left = `${threshold() * 100}%`;
     renderStatus();
   });
 }
 
-$("start").onclick = () => {
+/** Recording protection is on when both windows are hidden from recordings and screenshots aren't allowed. */
+const isProtected = () => S().hidePrompterFromCapture && S().hideControlsFromCapture && !S().allowScreenshots;
+
+$("start").onclick = async () => {
   if (!active()?.body.trim()) return;
-  cmd({ type: status?.playing || status?.counting ? "pause" : "play" });
+  const running = status?.playing || status?.counting;
+  // Starting while recordings can see the prompter: warn first.
+  if (!running && !isProtected()) {
+    const choice = await choiceDialog(
+      "Recording protection is off",
+      "Recordings and screen sharing will show the prompter and this window.",
+      "Turn On and Start",
+      "btn primary",
+      "Start Anyway",
+      "btn danger-fill",
+    );
+    if (choice === "cancel") return;
+    if (choice === "ok") setProtection(true);
+  }
+  cmd({ type: running ? "pause" : "play" });
   showPrompter();
 };
+
+/**
+ * Protection was just turned off (switch, Settings or the screenshot hotkey).
+ * If the script is scrolling, pause it at once and ask what to do.
+ */
+async function protectionTurnedOff() {
+  if (!(status?.playing || status?.counting)) return;
+  cmd({ type: "pause" });
+  if (dialogResolve) return; // a dialog is already up; the pause is what matters
+  const choice = await choiceDialog(
+    "Recording protection is off",
+    "The script is paused. Recordings and screen sharing will now show the prompter and this window.",
+    "Turn On and Resume",
+    "btn primary",
+    "Resume Anyway",
+    "btn danger-fill",
+  );
+  if (choice === "cancel") return;
+  if (choice === "ok") setProtection(true);
+  cmd({ type: "play" });
+}
 $("t-rewind").onclick = () => cmd({ type: "rewind" });
 $("t-back").onclick = () => cmd({ type: "back" });
 $("t-fwd").onclick = () => cmd({ type: "forward" });
@@ -1015,11 +1252,17 @@ $("bar").onkeydown = (e) => {
   else return;
   e.preventDefault();
 };
-$("btn-recording").onclick = () => openSettings("window");
 $("nav-hotkeys").onclick = () => openSettings("hotkeys");
 $("nav-appearance").onclick = () => openSettings("look");
 $("nav-scripts").onclick = () => $("search").focus();
+let aboutTimer: number | undefined;
 $("nav-about").onclick = () => {
+  // About stays highlighted while its message shows, then Scripts takes it back.
+  setNav("nav-about");
+  clearTimeout(aboutTimer);
+  aboutTimer = window.setTimeout(() => {
+    if ($("drawer-backdrop").hidden) setNav("nav-scripts");
+  }, 2600);
   const credit = $("credit");
   credit.classList.remove("highlight");
   void credit.offsetWidth;
@@ -1033,15 +1276,15 @@ $("btn-tray").onclick = async () => {
   toast(`Minimised to the tray${k ? `. ${k} brings it back` : ""}.`);
   await w.hide();
 };
-$("rec-switch").onchange = (e) => {
-  const on = (e.target as HTMLInputElement).checked;
+function setProtection(on: boolean) {
   // Turning protection on also ends "Allow screenshots", otherwise the switch would stay off and look broken.
   data.settings = { ...S(), hidePrompterFromCapture: on, hideControlsFromCapture: on, ...(on ? { allowScreenshots: false } : {}) };
   save();
   pushSettings();
   applyCapture();
   refreshFields();
-};
+}
+$("rec-switch").onchange = (e) => setProtection((e.target as HTMLInputElement).checked);
 
 let status: PrompterStatus | null = null;
 function fmt(sec: number) {
@@ -1058,9 +1301,6 @@ function renderStatus() {
   start.dataset.playing = String(hasText && !!st && (st.playing || st.counting > 0));
   const hk = S().hotkeys["play-pause"];
   const hkBroken = hotkeyProblems.some((p) => p.action === "play-pause");
-  const keys = $("start-keys");
-  keys.hidden = !hasText || !hk || hkBroken;
-  keys.textContent = hk ? hk.replace(/\+/g, " + ") : "";
   $("start-hint").textContent = !hasText
     ? "Write or import a script first."
     : !hk ? "No play/pause hotkey set."
@@ -1068,19 +1308,20 @@ function renderStatus() {
     : "";
   renderNotices();
   const startMain = $("start-main");
-  if (!hasText) startMain.innerHTML = `${PLAY}<span>Start prompting</span>`;
+  if (!hasText) startMain.innerHTML = `${PLAY}<span>Start Prompting</span>`;
   if (!st) return;
   if (hasText) {
     const running = st.playing || st.counting > 0;
-    const label = st.counting ? `Starting in ${st.counting}…` : st.playing ? "Pause" : st.progress > 0.001 ? "Resume" : "Start prompting";
+    const label = st.counting ? `Starting in ${st.counting}…` : st.playing ? "Pause" : st.progress > 0.001 ? "Resume" : "Start Prompting";
     startMain.innerHTML = `${running ? PAUSE : PLAY}<span>${label}</span>`;
   }
-  $("fill").style.width = `${st.progress * 100}%`;
+  $("bar").style.setProperty("--p", String(st.progress));
+  $("bar").classList.toggle("playing", st.playing);
   $("bar").setAttribute("aria-valuetext", `${Math.round(st.progress * 100)}% through`);
   $("elapsed").textContent = fmt(st.elapsed);
   $("remaining").textContent = `-${fmt(st.remaining)}`;
   $("wpm").textContent = st.wpm > 0 ? `about ${st.wpm} words/min` : "";
-  $("btn-prompter-label").textContent = st.visible ? "Hide prompter" : "Show prompter";
+  $("btn-prompter-label").textContent = st.visible ? "Hide Prompter" : "Show Prompter";
 
   const box = $("voice-box");
   const heard = $("heard");
@@ -1095,6 +1336,7 @@ function renderStatus() {
 
 listen<PrompterStatus>("gp:status", (e) => {
   status = e.payload;
+  if (status.visible) prompterOpened = true;
   renderStatus();
 });
 
@@ -1110,18 +1352,33 @@ listen<{ level: number }>("gp:voice-level", (e) => {
 
 listen<Partial<Settings>>("gp:patch", (e) => {
   data.settings = { ...S(), ...e.payload };
+  // Changes made on the prompter itself save as before, even with Settings open.
+  if (settingsBase) settingsBase = { ...settingsBase, ...e.payload };
   save();
   refreshFields();
 });
 
+// A Settings button on one of the prompter's tips: bring this window up on that tab.
+listen<string>("gp:open-settings", async (e) => {
+  const w = await Window.getByLabel("main");
+  if (w) {
+    await w.unminimize().catch(() => {});
+    await w.show().catch(() => {});
+    await w.setFocus().catch(() => {});
+  }
+  if ($("drawer-backdrop").hidden) openSettings(e.payload);
+  else selectTab(e.payload);
+});
+
 listen("gp:prompter-hidden", () => {
   const k = keysFor("toggle-prompter");
-  toast(`Prompter hidden. Use Show prompter${k ? ` or ${k}` : ""} to bring it back.`);
+  toast(`Prompter hidden. Use Show Prompter${k ? ` or ${k}` : ""} to bring it back.`);
 });
 
 // The screenshot hotkey flips the setting, so the switch in All settings always shows the real state.
 listen("gp:toggle-screenshots", () => {
   const on = !S().allowScreenshots;
+  if (settingsBase) settingsBase = { ...settingsBase, allowScreenshots: on };
   set("allowScreenshots", on);
   toast(on ? "Screenshots allowed. The prompter and this window show in screenshots and recordings." : "Screenshots off. The prompter and this window are hidden again.");
 });
@@ -1148,6 +1405,7 @@ listen("gp:prompter-ready", () => {
 
 function refreshFields() {
   for (const r of refreshers) r();
+  updateSaveState();
 }
 
 // ---------- Scripts list + editor ----------
@@ -1194,14 +1452,41 @@ function loadEditor() {
   bodyEl.value = s?.body ?? "";
   updateStats();
   renderStatus();
+  if (previewing) renderPreview();
 }
+
+// ---------- Preview: the script with its formatting applied, instead of the markup ----------
+let previewing = false;
+function renderPreview() {
+  const box = $("preview");
+  renderScript(bodyEl.value, box);
+  if (!box.childElementCount) box.innerHTML = '<p class="preview-empty">Nothing to preview yet.</p>';
+}
+function setPreview(on: boolean) {
+  previewing = on;
+  if (on) renderPreview();
+  $("preview").hidden = !on;
+  bodyEl.hidden = on;
+  $("btn-preview").setAttribute("aria-pressed", String(on));
+  // Shows the eye while editing (press to preview) and the pencil while previewing (press to edit).
+  $("btn-preview").innerHTML = on ? ICONS.pencil : ICONS.eye;
+  const tip = on ? "Edit: back to the script's text and formatting marks" : "Preview: see the script formatted, the way the prompter shows it";
+  $("btn-preview").title = tip;
+  $("btn-preview").setAttribute("aria-label", tip);
+  // The formatting buttons only work on the editable text.
+  document.querySelectorAll<HTMLButtonElement | HTMLInputElement>(".format-bar [data-wrap], #btn-cue, #fmt-color").forEach((b) => (b.disabled = on));
+  (on ? $("preview") : bodyEl).focus();
+}
+$("btn-preview").onclick = () => setPreview(!previewing);
+// Double-click the preview to go back to editing.
+$("preview").ondblclick = () => setPreview(false);
 
 function updateStats() {
   const wc = countWords(bodyEl.value);
   const secs = Math.round((wc / 150) * 60);
   const dur = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
-  for (const id of ["wc", "wc2"]) $(id).textContent = String(wc);
-  for (const id of ["dur", "dur2"]) $(id).textContent = dur;
+  $("wc").textContent = String(wc);
+  $("dur").textContent = dur;
 }
 
 
@@ -1227,7 +1512,7 @@ bodyEl.addEventListener("input", () => {
   if (!s) return;
   s.body = bodyEl.value;
   s.updatedAt = Date.now();
-  $("saved").textContent = "Saving…";
+  setSaveStatus("saving");
   save();
   pushScript();
   updateStats();
@@ -1281,6 +1566,7 @@ document.addEventListener("mousedown", (e) => {
 
 $("btn-new").onclick = () => {
   addScript("", "");
+  if (previewing) setPreview(false); // a new script needs the editor
   titleEl.focus();
 };
 $("btn-import").onclick = () => $<HTMLInputElement>("file").click();
@@ -1299,7 +1585,7 @@ $("btn-del").onclick = async () => {
   const s = active();
   if (!s) return;
   const name = s.title.trim() || "Untitled script";
-  const ok = await confirmDialog(`Delete "${name}"?`, "The script is removed from this PC. This can't be undone.", "Delete script");
+  const ok = await confirmDialog(`Delete "${name}"?`, "The script is removed from this PC. This can't be undone.", "Delete Script");
   if (!ok) return;
   data.scripts = data.scripts.filter((x) => x.id !== s.id);
   if (data.scripts.length === 0) addScript("", "");
@@ -1361,7 +1647,12 @@ window.addEventListener("drop", (e) => {
 });
 
 // ---------- Window, capture & hotkeys ----------
+/** Protection state the last time it was applied (null before the first time). */
+let wasProtected: boolean | null = null;
 async function applyCapture() {
+  const nowProtected = isProtected();
+  if (wasProtected === true && !nowProtected) protectionTurnedOff();
+  wasProtected = nowProtected;
   const results = await Promise.all(
     ([["prompter", S().hidePrompterFromCapture && !S().allowScreenshots], ["main", S().hideControlsFromCapture && !S().allowScreenshots]] as [string, boolean][]).map(([label, hidden]) =>
       invoke<{ hidden: boolean }>("set_capture_hidden", { label, hidden }).then((r) => r.hidden).catch(() => null),
@@ -1416,10 +1707,9 @@ async function loadDevices(announce = false) {
 
 // ---------- Start ----------
 const splash = initSplash({
-  // The prompter stays hidden until the person is through the start screen.
+  // The prompter stays hidden until the person opens it.
   onContinue: () => {
     splashDone = true;
-    showPrompter();
     renderNotices();
   },
   onError: (msg) => toast(msg, true),
@@ -1452,10 +1742,10 @@ async function init() {
   if (loadProblem) {
     // Don't overwrite a file we couldn't read; let the person decide.
     showBanner(`Your saved scripts couldn't be read (${loadProblem}). Nothing is saved until you select Save anyway, which replaces the old file.`);
-    $("btn-retry-save").textContent = "Save anyway";
+    $("btn-retry-save").textContent = "Save Anyway";
     $("btn-retry-save").onclick = () => {
       ready = true;
-      $("btn-retry-save").textContent = "Try again";
+      $("btn-retry-save").textContent = "Try Again";
       $("btn-retry-save").onclick = () => saveNow();
       saveNow();
     };

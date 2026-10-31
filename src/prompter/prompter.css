@@ -42,7 +42,6 @@ html, body {
   --tb-accent: #2f6fe8;
   --tb-shadow: rgba(0, 4, 20, 0.55);
   --glow: rgba(47, 111, 232, 0.3);
-  --outline: 0 0 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.7);
   position: fixed;
   inset: 0;
   container: root / inline-size;
@@ -61,7 +60,6 @@ html, body {
   --tb-accent: #2463d4;
   --tb-shadow: rgba(35, 59, 100, 0.22);
   --glow: rgba(36, 99, 212, 0.1);
-  --outline: 0 0 2px rgba(255, 255, 255, 0.95), 0 0 6px rgba(255, 255, 255, 0.7);
 }
 #root.hovered:not(.click-through) { box-shadow: inset 0 0 0 1px rgba(127, 168, 255, 0.45); }
 
@@ -306,7 +304,7 @@ html, body {
   min-width: 38px;
   height: 36px;
   padding: 0 8px;
-  border-radius: 10px;
+  border-radius: 999px;
   color: var(--tb-text);
   font: 600 12.5px "Segoe UI Variable Text", "Segoe UI", sans-serif;
   cursor: pointer;
@@ -323,8 +321,8 @@ svg.stroke { fill: none !important; stroke: currentColor; stroke-width: 1.8; str
 
 #toolbar .stepper { display: flex; align-items: center; gap: 6px; }
 #toolbar .stepper .sq { min-width: 40px; height: 38px; background: var(--tb-chip); border: 1px solid var(--tb-line); }
-#toolbar .stepper .sq:hover { background: var(--tb-hover); border-color: var(--tb-accent); }
-#toolbar .speed { min-width: 52px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: var(--tb-chip); border: 1px solid var(--tb-line); color: var(--tb-text); font: 700 15px "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+#toolbar .stepper .sq:hover { background: var(--tb-hover); }
+#toolbar .speed { min-width: 52px; height: 38px; display: grid; place-items: center; border-radius: 999px; background: var(--tb-chip); border: 1px solid var(--tb-line); color: var(--tb-text); font: 700 15px "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
 
 #toolbar .select { min-width: 150px; gap: 8px; padding: 0 12px; background: var(--tb-chip); border: 1px solid var(--tb-line); position: relative; justify-content: space-between; }
 #toolbar .select svg:first-child { width: 18px; height: 18px; color: var(--tb-accent); }
@@ -332,7 +330,7 @@ svg.stroke { fill: none !important; stroke: currentColor; stroke-width: 1.8; str
 #toolbar .select > span:not(.mic) { flex: 1; text-align: left; }
 #toolbar .mic { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: transparent; transition: background-color 0.1s; }
 #toolbar .mic.live { background: #3ecf8e; }
-#toolbar .mic.idle { background: var(--tb-dim); }
+/* Only lights up while it hears you; no grey dot while the mic is just listening. */
 #mode-menu { position: absolute; top: 44px; left: 5px; right: 5px; z-index: 12; display: flex; flex-direction: column; padding: 4px; border-radius: 12px; background: var(--tb-bg); border: 1px solid var(--tb-line); box-shadow: 0 10px 30px var(--tb-shadow); }
 #mode-menu[hidden] { display: none; }
 #mode-menu button { justify-content: flex-start; width: 100%; padding: 0 10px; height: 34px; }
@@ -430,21 +428,41 @@ svg.stroke { fill: none !important; stroke: currentColor; stroke-width: 1.8; str
 }
 #ct-chip[hidden], #tip[hidden], #help[hidden] { display: none; }
 
-/* First-run tip, pinned under the toolbar. */
+/* First-run tips: a card placed under (or above) what it points at. */
 #tip {
-  position: absolute; top: 50px; left: 50%; transform: translateX(-50%); z-index: 11;
+  position: absolute; top: 50px; left: 50%; z-index: 11;
   width: min(360px, calc(100% - 24px)); padding: 12px 14px 12px;
   border-radius: 12px; background: var(--tb-chip); border: 1px solid var(--tb-accent);
   box-shadow: 0 10px 28px var(--tb-shadow);
   color: var(--tb-dim); font: 13px/1.5 "Segoe UI Variable Text", "Segoe UI", sans-serif;
 }
 #tip::before {
-  content: ""; position: absolute; top: -7px; left: 50%; width: 12px; height: 12px;
+  content: ""; position: absolute; top: -7px; left: var(--arrow-x, 50%); width: 12px; height: 12px;
   transform: translateX(-50%) rotate(45deg); background: var(--tb-chip);
   border-left: 1px solid var(--tb-accent); border-top: 1px solid var(--tb-accent);
 }
+/* Above its target: the pointer sits on the bottom edge instead. */
+#tip.above::before { top: auto; bottom: -7px; transform: translateX(-50%) rotate(225deg); }
 #tip p { margin: 0 0 6px; }
 #tip b { color: var(--tb-text); }
+.tip-count { margin-bottom: 4px; font-size: 11.5px; font-weight: 600; color: var(--tb-accent); }
+.tip-actions { display: flex; gap: 8px; margin-top: 4px; }
+#tip button[hidden] { display: none; } /* "all: unset" would otherwise undo [hidden] */
+/* Got It next to a blue Settings button: plain, so Settings stands out. */
+#tip button.secondary { background: transparent; color: var(--tb-text); box-shadow: inset 0 0 0 1px var(--tb-line); }
+#tip button.secondary:hover { filter: none; background: var(--tb-hover); }
+
+/* What the current tip is about gently pulses. */
+#tb-through.tip-focus { border-radius: 999px; animation: tip-pulse 1.4s ease-in-out infinite; }
+#guide.tip-focus .arrow, #guide.tip-focus .line, #guide.tip-focus .band { animation: guide-pulse 1.4s ease-in-out infinite; }
+@keyframes tip-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tb-accent) 60%, transparent); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+@keyframes guide-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+  50% { filter: drop-shadow(0 0 8px var(--guide)) drop-shadow(0 0 3px var(--guide)); }
+}
 #tip button, #help button {
   all: unset; box-sizing: border-box; cursor: pointer;
   padding: 6px 14px; border-radius: 8px; background: var(--tb-accent); color: #fff;
@@ -452,6 +470,10 @@ svg.stroke { fill: none !important; stroke: currentColor; stroke-width: 1.8; str
 }
 #tip button:hover, #help button:hover { filter: brightness(1.12); }
 #tip button:focus-visible, #help button:focus-visible { outline: 2px solid var(--tb-accent); outline-offset: 2px; }
+/* The help panel's close button is a plain cross, not a blue button. */
+#help #help-close { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: transparent; color: var(--tb-dim); }
+#help #help-close:hover { filter: none; background: var(--tb-hover); color: var(--tb-text); }
+#help #help-close svg { width: 14px; height: 14px; fill: currentColor; }
 
 /* While teaching, the resize edges are drawn so you can see where to grab. */
 #root.teaching { box-shadow: inset 0 0 0 2px rgba(127, 168, 255, 0.85); }

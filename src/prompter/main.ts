@@ -60,14 +60,17 @@ document.getElementById("app")!.innerHTML = `
     <div id="timer">${ICON.clock}<span id="timer-text"></span></div>
     <div id="toast"></div>
     <div id="ct-chip" hidden></div>
-    <div id="tip" role="dialog" aria-label="How to move the prompter" hidden>
-      <p><b>Drag the dotted handle</b> under the toolbar to move the prompter. <b>Drag any edge</b> to resize it.</p>
-      <p>Press <b>?</b> on the bar for every shortcut. Hold Alt and drag to move it from anywhere.</p>
-      <button id="tip-ok">Got it</button>
+    <div id="tip" role="dialog" aria-labelledby="tip-count" hidden>
+      <div class="tip-count" id="tip-count"></div>
+      <div id="tip-body"></div>
+      <div class="tip-actions">
+        <button id="tip-settings">Settings</button>
+        <button id="tip-ok">Got It</button>
+      </div>
     </div>
-    <div id="help" role="dialog" aria-modal="true" aria-label="Shortcuts and gestures" hidden>
+    <div id="help" role="dialog" aria-modal="true" aria-label="Shortcuts and Gestures" hidden>
       <div class="help-card">
-        <div class="help-head"><h2>Shortcuts and gestures</h2><button id="help-close">Close</button></div>
+        <div class="help-head"><h2>Shortcuts and Gestures</h2><button id="help-close" aria-label="Close" title="Close">${ICON.close}</button></div>
         <div class="help-body" id="help-body"></div>
       </div>
     </div>
@@ -98,8 +101,8 @@ document.getElementById("app")!.innerHTML = `
       </div>
       <span class="sep" data-tauri-drag-region></span>
       <div class="tb-item mode-item" data-tauri-drag-region>
-        <button id="tb-mode" class="select" title="Scroll mode (M)" aria-haspopup="menu" aria-expanded="false">${ICON.wave}<span id="tb-mode-text">Fixed speed</span>${ICON.chevron}<span class="mic" id="tb-mic" title="Microphone"></span></button>
-        <span class="tb-label" data-tauri-drag-region>Scrolling mode</span>
+        <button id="tb-mode" class="select" title="Scroll mode (M)" aria-haspopup="menu" aria-expanded="false">${ICON.wave}<span id="tb-mode-text">Fixed Speed</span>${ICON.chevron}<span class="mic" id="tb-mic" title="Microphone"></span></button>
+        <span class="tb-label" data-tauri-drag-region>Scrolling Mode</span>
         <div id="mode-menu" role="menu" hidden>
           ${(["manual", "voice", "follow"] as ScrollMode[]).map((m) => `<button role="menuitemradio" data-mode="${m}">${MODE_LABELS[m]}</button>`).join("")}
         </div>
@@ -107,7 +110,7 @@ document.getElementById("app")!.innerHTML = `
       <span class="sep" data-tauri-drag-region></span>
       <div class="tb-item" data-tauri-drag-region>
         <button id="tb-through" class="toggle" role="switch" aria-checked="false" title="Clicks pass through to the app underneath">${ICON.cursor}<span class="knob" aria-hidden="true"><span></span></span></button>
-        <span class="tb-label" data-tauri-drag-region>Click-through</span>
+        <span class="tb-label" data-tauri-drag-region>Click Through</span>
       </div>
       <span class="sep" data-tauri-drag-region></span>
       <div class="tb-item" data-tauri-drag-region>
@@ -229,6 +232,7 @@ function applySettings() {
   r.setProperty("--read", String(s.readOpacity / 100));
   r.setProperty("--margin", `${s.marginX}%`);
   r.setProperty("--bg", hexToRgba(s.bgColor, s.bgOpacity / 100));
+  r.setProperty("--outline", `0 0 2px ${hexToRgba(s.outlineColor, 0.95)}, 0 0 6px ${hexToRgba(s.outlineColor, 0.7)}`);
 
   content.classList.toggle("upper", s.uppercase);
   content.classList.toggle("outline", s.textOutline);
@@ -253,7 +257,7 @@ function applySettings() {
   const ctKeys = s.hotkeys["toggle-click-through"];
   const hideKeys = s.hotkeys["toggle-prompter"];
   $("tb-through").title = `Clicks pass through to the app underneath${ctKeys ? ` (${showKeys(ctKeys)})` : ""}`;
-  $("tb-hide").title = hideKeys ? `Hide the prompter (${showKeys(hideKeys)} brings it back)` : "Hide the prompter (Show prompter in the main window brings it back)";
+  $("tb-hide").title = hideKeys ? `Hide the prompter (${showKeys(hideKeys)} brings it back)` : "Hide the prompter (Show Prompter in the main window brings it back)";
   const chip = $("ct-chip");
   chip.hidden = !s.clickThrough;
   chip.textContent = ctKeys ? `Click-through on · ${ctKeys.replace(/\+/g, " + ")} turns it off` : "Click-through on · turn it off from the tray icon";
@@ -797,25 +801,111 @@ function closeHelp() {
   $("help").hidden = true;
 }
 
-// One-time tip: keeps the toolbar up and outlines the edges so moving and resizing are obvious.
-let tipShowing = false;
-function maybeShowTip() {
-  if (settings.seenPrompterTip || tipShowing || !visible || rendered.wordCount === 0) return;
-  tipShowing = true;
-  $("tip").hidden = false;
-  root.classList.add("teaching");
-  toolbar.classList.add("on");
-  // Point the tip at the drag handle, wherever the toolbar's height puts it.
-  $("tip").style.top = `${$("drag-handle").getBoundingClientRect().bottom + 12}px`;
+// ---------- First-run tips ----------
+// Three short tips, one after another, each pointing at what it's about:
+// moving the prompter, Click Through, and the reading guide. The last two offer a Settings button.
+interface Tip {
+  html: () => string;
+  /** What the tip points at and highlights. Not on screen: the tip is skipped. */
+  target: () => HTMLElement | null;
+  /** The Settings tab with this feature's options. */
+  tab?: string;
+  /** Outline the window edges and pulse the drag handle. */
+  teach?: boolean;
 }
+const onScreen = (el: HTMLElement | null) => (el && el.getClientRects().length ? el : null);
+const TIPS: Tip[] = [
+  {
+    html: () =>
+      "<p><b>Drag the dotted handle</b> under the toolbar to move the prompter. <b>Drag any edge</b> to resize it.</p>" +
+      "<p>Press <b>?</b> on the bar for every shortcut. Hold Alt and drag to move it from anywhere.</p>",
+    target: () => onScreen($("drag-handle")),
+    teach: true,
+  },
+  {
+    html: () => {
+      const k = settings.hotkeys["toggle-click-through"];
+      return "<p><b>Click Through</b> lets your clicks go to the slides behind the prompter." +
+        (k ? ` Turn it off from any app with <b>${k.replace(/\+/g, " + ")}</b>.` : "") + "</p>" +
+        "<p>Change it in <b>Settings</b> under Window, and its hotkey under Hotkeys.</p>";
+    },
+    target: () => onScreen($("tb-through")),
+    tab: "window",
+  },
+  {
+    html: () =>
+      "<p>The blue <b>reading guide</b> marks the line to read. Keep your eyes there and the words come to you.</p>" +
+      "<p>Change its style, colour and height in <b>Settings</b> under Colours.</p>",
+    target: () => {
+      if (!settings.guideEnabled) return null;
+      return settings.guideStyle === "arrows" ? onScreen(document.querySelector<HTMLElement>("#guide .arrow.right")) : onScreen($("guide"));
+    },
+    tab: "look",
+  },
+];
+let tipShowing = false;
+let tipIndex = 0;
+let tipTarget: HTMLElement | null = null;
+
+function maybeShowTip() {
+  if (tipShowing || !visible || rendered.wordCount === 0 || settings.clickThrough || playing || counting) return;
+  // Keep the toolbar up so its buttons can be measured and pointed at.
+  toolbar.classList.add("on");
+  let i = settings.prompterTipsSeen;
+  // Skip tips whose target isn't showing (say the reading guide is off, or the toolbar is too narrow).
+  while (i < TIPS.length && !TIPS[i].target()) i++;
+  if (i !== settings.prompterTipsSeen) patchSettings({ prompterTipsSeen: i });
+  if (i >= TIPS.length) return;
+  const tip = TIPS[i];
+  tipShowing = true;
+  tipIndex = i;
+  tipTarget = tip.target();
+  $("tip-count").textContent = `Tip ${i + 1} of ${TIPS.length}`;
+  $("tip-body").innerHTML = tip.html();
+  $("tip-settings").hidden = !tip.tab;
+  // With a Settings button, that's the blue one and Got It is plain.
+  $("tip-ok").classList.toggle("secondary", !!tip.tab);
+  root.classList.toggle("teaching", !!tip.teach);
+  // The reading guide's arrows pulse together; anything else gets its own highlight.
+  (tipTarget?.closest("#guide") ?? tipTarget)?.classList.add("tip-focus");
+  $("tip").hidden = false;
+  placeTip();
+}
+
+/** Puts the tip just under its target (or above, if there's no room), with its pointer at the target. */
+function placeTip() {
+  if (!tipShowing || !tipTarget) return;
+  const tipEl = $("tip");
+  const r = tipTarget.getBoundingClientRect();
+  const w = tipEl.offsetWidth;
+  const h = tipEl.offsetHeight;
+  const centre = r.left + r.width / 2;
+  const left = Math.max(12, Math.min(innerWidth - w - 12, centre - w / 2));
+  const below = r.bottom + 12 + h < innerHeight - 8;
+  tipEl.classList.toggle("above", !below);
+  tipEl.style.left = `${left}px`;
+  tipEl.style.top = `${below ? r.bottom + 12 : r.top - 12 - h}px`;
+  tipEl.style.setProperty("--arrow-x", `${Math.max(16, Math.min(w - 16, centre - left))}px`);
+}
+addEventListener("resize", placeTip);
+
 function dismissTip() {
   if (!tipShowing) return;
   tipShowing = false;
   $("tip").hidden = true;
   root.classList.remove("teaching");
-  patchSettings({ seenPrompterTip: true });
+  document.querySelectorAll(".tip-focus").forEach((el) => el.classList.remove("tip-focus"));
+  tipTarget = null;
+  patchSettings({ prompterTipsSeen: tipIndex + 1 });
   showToolbar();
+  // The next tip follows shortly, unless the script has started.
+  setTimeout(maybeShowTip, 350);
 }
+$("tip-settings").onclick = () => {
+  const tab = TIPS[tipIndex]?.tab;
+  if (tab) emitTo("main", "gp:open-settings", tab).catch(() => {});
+  dismissTip();
+};
 
 listen("gp:main-to-tray", () => {
   const k = settings.hotkeys["toggle-controls"];
