@@ -1,5 +1,6 @@
 mod capture;
 mod hotkeys;
+mod overlay;
 mod store;
 mod voice;
 mod vosk;
@@ -50,18 +51,10 @@ fn restore_prompter<R: Runtime>(window: &tauri::Window<R>) {
     });
 }
 
-/// WebView2 can decide the prompter is covered after another app (Windows Photos, for one)
-/// opens or closes over it, and then stops drawing it even though the window is showing.
-/// Flipping the WebView's visibility makes it draw again, like hiding and showing does.
 #[tauri::command]
 fn wake_prompter(app: AppHandle) -> Result<(), String> {
     let w = app.get_webview_window("prompter").ok_or("No prompter window")?;
-    w.with_webview(|pw| unsafe {
-        let c = pw.controller();
-        let _ = c.SetIsVisible(false);
-        let _ = c.SetIsVisible(true);
-    })
-    .map_err(|e| e.to_string())
+    overlay::refresh(&w).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -210,6 +203,9 @@ pub fn run() {
         ])
         .setup(|app| {
             place_prompter_first_run(app.handle());
+            if let Some(window) = app.get_webview_window("prompter") {
+                overlay::watch_photos(window)?;
+            }
             build_tray(app)?;
             Ok(())
         })
