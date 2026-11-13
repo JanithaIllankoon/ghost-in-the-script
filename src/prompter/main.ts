@@ -632,6 +632,7 @@ function sendStatus() {
     },
     clickThrough: settings.clickThrough,
     visible,
+    rid: lastRid,
   };
   emitTo("main", "gp:status", status).catch(() => {});
 }
@@ -763,8 +764,11 @@ listen<Settings>("gp:settings", (e) => {
 listen<{ id: string | null; body: string }>("gp:script", (e) => {
   if (e.payload.id !== scriptId || e.payload.body !== scriptBody) setScript(e.payload.id, e.payload.body);
 });
-listen<PrompterCommand>("gp:cmd", (e) => {
+/** Id of the last phone remote command carried out, sent back in the status so the phone can time it. */
+let lastRid = 0;
+listen<PrompterCommand & { rid?: number }>("gp:cmd", (e) => {
   const c = e.payload;
+  if (typeof c.rid === "number") lastRid = c.rid;
   if (c.type === "play") play();
   else if (c.type === "pause") stop();
   else if (c.type === "seek") seek(c.fraction);

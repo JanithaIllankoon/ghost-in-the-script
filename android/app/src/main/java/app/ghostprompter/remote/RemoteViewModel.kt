@@ -23,6 +23,7 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /** The prompter's state, as the PC reports it every 400 ms. */
 data class PrompterStatus(
@@ -38,6 +39,24 @@ data class PrompterStatus(
     val clickThrough: Boolean = false,
     val visible: Boolean = false,
 )
+
+/** One line of the latency log. [ms] is null for events like connecting or losing the connection. */
+data class LogEntry(val at: Long, val what: String, val ms: Long?, val failed: Boolean = false)
+
+/** Round-trip times: the last value, and the average, lowest, highest and 95th percentile of recent ones. */
+data class Stats(val last: Long, val avg: Long, val min: Long, val max: Long, val p95: Long, val count: Int) {
+    companion object {
+        fun of(values: List<Long>): Stats? {
+            if (values.isEmpty()) return null
+            val sorted = values.sorted()
+            val p95 = sorted[((sorted.size - 1) * 0.95).toInt()]
+            return Stats(values.last(), values.average().toLong(), sorted.first(), sorted.last(), p95, values.size)
+        }
+    }
+}
+
+/** A timed message waiting for its reply. [viaStatus]: done when a prompter status reports this id or a later one. */
+private data class Pending(val label: String, val sentNanos: Long, val viaStatus: Boolean)
 
 sealed interface Conn {
     data object NotPaired : Conn
@@ -71,6 +90,9 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     val message: StateFlow<String?> = _message
     private val _fine = MutableStateFlow(store.fineSteps)
     val fineSteps: StateFlow<Boolean> = _fine
+    private val controlGate = ControlCooldown()
+    private val _cooldownUntil = MutableStateFlow(0L)
+    val cooldownUntil: StateFlow<Long> = _cooldownUntil
 
     /** Bumped for every new connection, so callbacks from an old socket are ignored. */
     private val gen = AtomicInteger(0)
@@ -78,6 +100,21 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     private var job: Job? = null
     private var started = false
     private var lastGoodHost: String? = null
+    // Latency
+    private val nextId = AtomicLong(1)
+    private val pending = ConcurrentHashMap<Long, Pending>()
+    private val timesLock = Any()
+    private val pingTimes = ArrayDeque<Long>()
+    private val cmdTimes = ArrayDeque<Long>()
+    private val _log = MutableStateFlow<List<LogEntry>>(emptyList())
+    /** Newest first, up to 300 lines. */
+    val log: StateFlow<List<LogEntry>> = _log
+    private val _pingStats = MutableStateFlow<Stats?>(null)
+    val pingStats: StateFlow<Stats?> = _pingStats
+    private val _cmdStats = MutableStateFlow<Stats?>(null)
+    val cmdStats: StateFlow<Stats?> = _cmdStats
+    private var pingJob: Job? = null
+
     /** Fields changed on the phone a moment ago, so a status already on its way doesn't flip them back. */
     private val holds = ConcurrentHashMap<String, Long>()
 
@@ -109,6 +146,9 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
         gen.incrementAndGet()
         job?.cancel()
         job = null
+        pingJob?.cancel()
+        pingJob = null
+        pending.clear()
         socket?.close(1000, null)
         socket = null
     }
@@ -157,19 +197,24 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
         drop()
         val my = gen.get()
         _conn.value = Conn.Connecting(p.name)
+        val began = SystemClock.elapsedRealtime()
         job = viewModelScope.launch {
             var wait = 1000L
             while (isActive && gen.get() == my) {
                 when (val r = tryHosts(p, my)) {
                     is Attempt.Ok -> {
                         lastGoodHost = r.host
+                        addLog("Connected to ${p.name} at ${r.host}", SystemClock.elapsedRealtime() - began)
+                        startPings(my)
                         return@launch
                     }
                     is Attempt.Denied -> {
+                        addLog("Refused: ${r.reason}", null, failed = true)
                         _conn.value = Conn.Problem(p.name, r.reason, retrying = false)
                         return@launch
                     }
                     Attempt.Unreachable -> {
+                        addLog("Couldn't reach ${p.name}", null, failed = true)
                         _conn.value = Conn.Problem(
                             p.name,
                             "Can't reach ${p.name}. Check that Phone Remote is on in the app's Settings and that both are on the same Wi-Fi.",
@@ -228,7 +273,11 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         webSocket.close(1000, null)
                     }
-                    "status" -> msg.optJSONObject("s")?.let { _status.value = merge(parseStatus(it)) }
+                    "status" -> msg.optJSONObject("s")?.let {
+                        _status.value = merge(parseStatus(it))
+                        if (it.has("rid")) settle(it.optLong("rid"), upTo = true)
+                    }
+                    "ack", "pong" -> if (msg.has("id")) settle(msg.optLong("id"), upTo = false)
                 }
             }
 
@@ -241,6 +290,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
                 // The connection dropped after it was working: try again straight away.
                 if (gen.get() == my && socket === webSocket) {
                     socket = null
+                    addLog("Connection lost", null, failed = true)
                     viewModelScope.launch {
                         delay(600)
                         if (gen.get() == my && started) connect(p)
@@ -271,7 +321,6 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
             speed = if (held("speed")) cur.speed else incoming.speed,
             mode = if (held("mode")) cur.mode else incoming.mode,
             clickThrough = if (held("clickThrough")) cur.clickThrough else incoming.clickThrough,
-            visible = if (held("visible")) cur.visible else incoming.visible,
         )
     }
 
@@ -296,49 +345,119 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
         return if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "$maker ${Build.MODEL}"
     }
 
+    // ---------- Latency ----------
+
+    private fun addLog(what: String, ms: Long?, failed: Boolean = false) {
+        val entry = LogEntry(System.currentTimeMillis(), what, ms, failed)
+        synchronized(timesLock) { _log.value = (listOf(entry) + _log.value).take(300) }
+    }
+
+    fun clearLog() {
+        synchronized(timesLock) {
+            _log.value = emptyList()
+            pingTimes.clear()
+            cmdTimes.clear()
+            _pingStats.value = null
+            _cmdStats.value = null
+        }
+    }
+
+    /** Sends [o] with a new id and remembers when, so the reply can be timed. */
+    private fun sendTimed(label: String, o: JSONObject, viaStatus: Boolean) {
+        val ws = socket ?: return
+        if (_conn.value !is Conn.Connected) return
+        val id = nextId.getAndIncrement()
+        pending[id] = Pending(label, SystemClock.elapsedRealtimeNanos(), viaStatus)
+        ws.send(o.put("id", id).toString())
+    }
+
+    /** A reply arrived for [id]. A prompter status means every command up to [id] is done. */
+    private fun settle(id: Long, upTo: Boolean) {
+        val now = SystemClock.elapsedRealtimeNanos()
+        val done = if (upTo) pending.filter { (k, v) -> v.viaStatus && k <= id } else pending.filterKeys { it == id }
+        for ((k, v) in done.toSortedMap()) {
+            if (pending.remove(k) == null) continue
+            val ms = (now - v.sentNanos) / 1_000_000
+            if (v.label == "Ping") {
+                record(pingTimes, ms, _pingStats)
+            } else {
+                record(cmdTimes, ms, _cmdStats)
+                addLog(v.label, ms)
+            }
+        }
+    }
+
+    private fun record(times: ArrayDeque<Long>, ms: Long, out: MutableStateFlow<Stats?>) {
+        synchronized(timesLock) {
+            times.addLast(ms)
+            while (times.size > 50) times.removeFirst()
+            out.value = Stats.of(times.toList())
+        }
+    }
+
+    /** Pings every 2 s while connected, and notes anything that never got a reply. */
+    private fun startPings(my: Int) {
+        pingJob?.cancel()
+        pingJob = viewModelScope.launch {
+            while (isActive && gen.get() == my) {
+                sendTimed("Ping", JSONObject().put("t", "ping"), viaStatus = false)
+                delay(2000)
+                val cutoff = SystemClock.elapsedRealtimeNanos() - 5_000_000_000L
+                for ((k, v) in pending.filterValues { it.sentNanos < cutoff }) {
+                    if (pending.remove(k) != null) addLog("${v.label}: no reply after 5 s", null, failed = true)
+                }
+            }
+        }
+    }
+
     // ---------- Commands ----------
 
-    private fun send(o: JSONObject) {
-        if (_conn.value is Conn.Connected) socket?.send(o.toString())
+    private fun control(action: () -> Unit) {
+        if (socket == null || _conn.value !is Conn.Connected) return
+        val now = SystemClock.elapsedRealtime()
+        if (!controlGate.acquire(now)) return
+        _cooldownUntil.value = controlGate.until
+        action()
     }
 
-    private fun cmd(type: String, extra: JSONObject.() -> Unit = {}) {
-        send(JSONObject().put("t", "cmd").put("cmd", JSONObject().put("type", type).apply(extra)))
+    private fun send(label: String, o: JSONObject) = control { sendTimed(label, o, viaStatus = false) }
+
+    private fun cmd(label: String, type: String, extra: JSONObject.() -> Unit = {}) {
+        val c = JSONObject().put("type", type).apply(extra)
+        sendTimed(label, JSONObject().put("t", "cmd").put("cmd", c), viaStatus = true)
     }
 
-    fun playPause() = cmd("play-pause")
+    fun playPause() = control { cmd(if (_status.value.playing || _status.value.counting > 0) "Pause" else "Play", "play-pause") }
     /** Stops and goes back to the start of the script. */
-    fun stop() = cmd("rewind")
-    fun backLine() = cmd("back")
-    fun forwardLine() = cmd("forward")
-    fun seek(fraction: Float) = cmd("seek") { put("fraction", fraction.toDouble().coerceIn(0.0, 1.0)) }
+    fun stop() = control { cmd("Stop", "rewind") }
+    fun backLine() = control { cmd("Back one line", "back") }
+    fun forwardLine() = control { cmd("Forward one line", "forward") }
+    fun seek(fraction: Float) =
+        cmd("Scroll to ${(fraction * 100).toInt()}%", "seek") { put("fraction", fraction.toDouble().coerceIn(0.0, 1.0)) }
 
     fun setSpeed(speed: Int) {
         val v = speed.coerceIn(1, 100)
         hold("speed")
         _status.value = _status.value.copy(speed = v)
-        cmd("set-speed") { put("speed", v) }
+        cmd("Speed $v", "set-speed") { put("speed", v) }
     }
 
-    fun setMode(mode: String) {
+    fun adjustSpeed(delta: Int) = control { setSpeed(_status.value.speed + delta) }
+
+    fun setMode(mode: String) = control {
         hold("mode")
         _status.value = _status.value.copy(mode = mode)
-        cmd("set-mode") { put("mode", mode) }
+        cmd("Mode: $mode", "set-mode") { put("mode", mode) }
     }
 
-    fun setClickThrough(on: Boolean) {
+    fun setClickThrough(on: Boolean) = control {
         hold("clickThrough")
         _status.value = _status.value.copy(clickThrough = on)
-        cmd("set-click-through") { put("on", on) }
+        cmd("Click-through ${if (on) "on" else "off"}", "set-click-through") { put("on", on) }
     }
 
-    fun showPrompter(on: Boolean) {
-        hold("visible")
-        _status.value = _status.value.copy(visible = on)
-        send(JSONObject().put("t", "show").put("on", on))
-    }
-
-    fun move(dx: Int, dy: Int) = send(JSONObject().put("t", "move").put("dx", dx).put("dy", dy))
-    fun resize(dw: Int, dh: Int) = send(JSONObject().put("t", "resize").put("dw", dw).put("dh", dh))
-    fun centre() = send(JSONObject().put("t", "centre"))
+    fun move(dx: Int, dy: Int) = send("Move", JSONObject().put("t", "move").put("dx", dx).put("dy", dy))
+    fun resize(dw: Int, dh: Int) = send("Resize", JSONObject().put("t", "resize").put("dw", dw).put("dh", dh))
+    fun centre() = send("Top centre", JSONObject().put("t", "centre"))
+    fun middle() = send("Reset to screen centre", JSONObject().put("t", "middle"))
 }

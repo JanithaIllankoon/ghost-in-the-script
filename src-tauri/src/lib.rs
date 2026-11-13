@@ -35,8 +35,6 @@ pub fn toggle_window<R: Runtime>(app: &AppHandle<R>, label: &str) {
 #[link(name = "user32")]
 extern "system" {
     fn ShowWindow(hwnd: *mut std::ffi::c_void, cmd: i32) -> i32;
-    fn GetForegroundWindow() -> *mut std::ffi::c_void;
-    fn SetForegroundWindow(hwnd: *mut std::ffi::c_void) -> i32;
 }
 const SW_SHOWNOACTIVATE: i32 = 4;
 
@@ -51,26 +49,6 @@ fn restore_prompter<R: Runtime>(window: &tauri::Window<R>) {
         }
         // Lets the window library re-read the state, so it doesn't think it's still minimised.
         let _ = w.unminimize();
-    });
-}
-
-/// Shows the prompter without taking focus from the app in front, for the phone remote:
-/// Panopto or PowerPoint should stay focused while the prompter appears over them.
-pub fn show_prompter_quietly<R: Runtime>(app: &AppHandle<R>) {
-    let Some(w) = app.get_webview_window("prompter") else { return };
-    if w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false) {
-        return;
-    }
-    let w2 = w.clone();
-    let _ = w.run_on_main_thread(move || {
-        let before = unsafe { GetForegroundWindow() };
-        if w2.is_minimized().unwrap_or(false) {
-            let _ = w2.unminimize();
-        }
-        let _ = w2.show();
-        if !before.is_null() {
-            unsafe { SetForegroundWindow(before) };
-        }
     });
 }
 

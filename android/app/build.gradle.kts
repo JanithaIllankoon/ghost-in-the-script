@@ -22,7 +22,7 @@ android {
         minSdk = 24
         targetSdk = 36
         // Keep in step with the desktop app's version.
-        versionCode = 10600
+        versionCode = 10605
         versionName = "1.6.0"
     }
 
@@ -63,6 +63,7 @@ kotlin {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     val composeBom = platform("androidx.compose:compose-bom:2025.10.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")

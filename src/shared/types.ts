@@ -291,6 +291,8 @@ export interface PrompterStatus {
   };
   clickThrough: boolean;
   visible: boolean;
+  /** Id of the last phone remote command the prompter carried out (for measuring latency). */
+  rid?: number;
 }
 
 /** Phone Remote server state, from the Rust side. */

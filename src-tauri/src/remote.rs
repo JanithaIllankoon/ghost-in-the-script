@@ -4,20 +4,26 @@
 //! The phone scans it, connects to `ws://<address>:<port>/` and sends the token first.
 //! Nothing is reachable without the token, and the server only runs while Phone Remote is on.
 //!
-//! Phone -> PC (JSON text frames)
+//! The phone only drives the prompter overlay: playback, speed, scroll mode, click-through,
+//! position and size. It can't show, hide, open or close any window, or reach the main window.
+//!
+//! Phone -> PC (JSON text frames). `id` is optional and only used to measure latency.
 //!   {"t":"hello","token":"…","device":"Pixel 8"}         must be the first message
-//!   {"t":"cmd","cmd":{"type":"play-pause"}}               any allowed prompter command (see ALLOWED_CMDS)
-//!   {"t":"show","on":true}                                show or hide the prompter
-//!   {"t":"move","dx":-20,"dy":0}                          move the prompter (logical pixels)
-//!   {"t":"resize","dw":40,"dh":0}                         resize it around its centre (logical pixels)
-//!   {"t":"centre"}                                        put it at the top centre of the main screen
-//!   {"t":"ping"}
+//!   {"t":"cmd","id":7,"cmd":{"type":"play-pause"}}        any allowed prompter command (see ALLOWED_CMDS)
+//!   {"t":"move","id":8,"dx":-20,"dy":0}                   move the prompter (logical pixels)
+//!   {"t":"resize","id":9,"dw":40,"dh":0}                  resize it around its centre (logical pixels)
+//!   {"t":"centre","id":10}                                move it to the top centre of the main screen
+//!   {"t":"middle","id":12}                                bring it back to the middle of the main screen,
+//!                                                          shrinking it if it's bigger than the screen
+//!   {"t":"ping","id":11}
 //!
 //! PC -> phone
 //!   {"t":"welcome","pc":"DESKTOP-1","version":"1.6.0"}
 //!   {"t":"denied","reason":"…"}                            then the connection closes
-//!   {"t":"status","s":{…PrompterStatus…}}                  every 400 ms and after each change
-//!   {"t":"pong"}
+//!   {"t":"status","s":{…PrompterStatus…, "rid":7}}         every 400 ms and after each change; `rid` is the
+//!                                                          id of the last command the prompter carried out
+//!   {"t":"ack","id":8}                                     a move, resize or centre is done
+//!   {"t":"pong","id":11}
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
@@ -28,7 +34,7 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Listener, LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize};
+use tauri::{AppHandle, Emitter, Listener, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, watch};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
@@ -362,80 +368,183 @@ fn constant_eq(a: &str, b: &str) -> bool {
 fn handle(app: &AppHandle, text: &str) -> Option<String> {
     let msg: Value = serde_json::from_str(text).ok()?;
     let num = |k: &str| msg.get(k).and_then(Value::as_f64).unwrap_or(0.0).clamp(-2000.0, 2000.0);
+    let id = msg.get("id").and_then(Value::as_u64);
+    let ack = || id.map(|id| serde_json::json!({ "t": "ack", "id": id }).to_string());
     match msg.get("t").and_then(Value::as_str)? {
-        "ping" => return Some(r#"{"t":"pong"}"#.into()),
+        "ping" => return Some(serde_json::json!({ "t": "pong", "id": id }).to_string()),
         "cmd" => {
             let cmd = msg.get("cmd")?;
             let kind = cmd.get("type").and_then(Value::as_str)?;
             if ALLOWED_CMDS.contains(&kind) {
-                let _ = app.emit_to("prompter", "gp:cmd", cmd.clone());
+                // Rebuilt from known fields only, plus `rid` so the prompter's next status says it's done.
+                let mut out = serde_json::json!({ "type": kind });
+                for key in ["fraction", "mode", "speed", "on"] {
+                    if let Some(v) = cmd.get(key) {
+                        out[key] = v.clone();
+                    }
+                }
+                if let Some(id) = id {
+                    out["rid"] = id.into();
+                }
+                let _ = app.emit_to("prompter", "gp:cmd", out);
             }
         }
-        "show" => {
-            if msg.get("on").and_then(Value::as_bool).unwrap_or(true) {
-                crate::show_prompter_quietly(app);
-            } else if let Some(w) = app.get_webview_window("prompter") {
-                let _ = w.hide();
-            }
+        // These only move or size the prompter. Whether it shows stays up to the person at the PC.
+        "move" => {
+            let (dx, dy) = (num("dx"), num("dy"));
+            on_prompter(app, move |w| move_by(w, dx, dy));
+            return ack();
         }
-        "move" => move_prompter(app, num("dx"), num("dy")),
-        "resize" => resize_prompter(app, num("dw"), num("dh")),
+        "resize" => {
+            let (dw, dh) = (num("dw"), num("dh"));
+            on_prompter(app, move |w| resize_by(w, dw, dh));
+            return ack();
+        }
         "centre" => {
-            crate::move_prompter_top_centre(app);
-            crate::show_prompter_quietly(app);
+            on_prompter(app, top_centre);
+            return ack();
+        }
+        "middle" => {
+            on_prompter(app, middle);
+            return ack();
         }
         _ => {}
     }
     None
 }
 
-/// Every monitor joined into one rectangle, so the prompter can move between screens but not off them.
-fn desktop_bounds(w: &tauri::WebviewWindow) -> Option<(i32, i32, i32, i32)> {
-    let monitors = w.available_monitors().ok()?;
-    let mut it = monitors.iter();
-    let first = it.next()?;
-    let (mut l, mut t) = (first.position().x, first.position().y);
-    let (mut r, mut b) = (l + first.size().width as i32, t + first.size().height as i32);
-    for m in it {
-        l = l.min(m.position().x);
-        t = t.min(m.position().y);
-        r = r.max(m.position().x + m.size().width as i32);
-        b = b.max(m.position().y + m.size().height as i32);
+/// Runs a change to the prompter window on the window thread and waits for it, so quick
+/// repeated taps happen one after another, each starting from where the last one left it.
+fn on_prompter(app: &AppHandle, f: impl FnOnce(&WebviewWindow) + Send + 'static) {
+    let Some(w) = app.get_webview_window("prompter") else { return };
+    let (tx, rx) = std::sync::mpsc::channel();
+    if app
+        .run_on_main_thread(move || {
+            f(&w);
+            let _ = tx.send(());
+        })
+        .is_ok()
+    {
+        let _ = rx.recv_timeout(Duration::from_secs(2));
     }
-    Some((l, t, r, b))
 }
 
-fn move_prompter(app: &AppHandle, dx: f64, dy: f64) {
-    let Some(w) = app.get_webview_window("prompter") else { return };
-    let (Ok(pos), Ok(size), Ok(scale)) = (w.outer_position(), w.outer_size(), w.scale_factor()) else { return };
-    let mut x = pos.x + (dx * scale).round() as i32;
-    let mut y = pos.y + (dy * scale).round() as i32;
-    if let Some((l, t, r, b)) = desktop_bounds(&w) {
-        // Keep at least 80 px of the prompter on screen, and its top edge reachable.
-        let keep = (80.0 * scale) as i32;
-        x = x.clamp(l - size.width as i32 + keep, r - keep);
-        y = y.clamp(t, b - keep);
+/// Left, top, right, bottom of a screen minus its taskbar.
+type Area = (i32, i32, i32, i32);
+
+fn area_of(m: &tauri::Monitor) -> Area {
+    let a = m.work_area();
+    (a.position.x, a.position.y, a.position.x + a.size.width as i32, a.position.y + a.size.height as i32)
+}
+
+/// The screen the prompter is on (or nearest to), so phone moves never push it off that screen.
+fn home_area(w: &WebviewWindow) -> Option<Area> {
+    let m = w.current_monitor().ok().flatten().or_else(|| w.primary_monitor().ok().flatten())?;
+    Some(area_of(&m))
+}
+
+fn main_area(w: &WebviewWindow) -> Option<Area> {
+    let m = w.primary_monitor().ok().flatten().or_else(|| w.current_monitor().ok().flatten())?;
+    Some(area_of(&m))
+}
+
+/// Smallest size the prompter allows, the same as its minimum in tauri.conf.json.
+fn min_size(scale: f64) -> (u32, u32) {
+    ((260.0 * scale).round() as u32, (120.0 * scale).round() as u32)
+}
+
+/// Shrinks the window to fit the area if needed, then slides it fully inside.
+fn fit(x: i32, y: i32, width: u32, height: u32, (l, t, r, b): Area) -> (i32, i32, u32, u32) {
+    let width = width.min((r - l).max(1) as u32);
+    let height = height.min((b - t).max(1) as u32);
+    let x = x.clamp(l, r - width as i32);
+    let y = y.clamp(t, b - height as i32);
+    (x, y, width, height)
+}
+
+fn place(w: &WebviewWindow, (x, y, width, height): (i32, i32, u32, u32), resize: bool) {
+    if resize {
+        let _ = w.set_size(PhysicalSize::new(width, height));
     }
     let _ = w.set_position(PhysicalPosition::new(x, y));
 }
 
-fn resize_prompter(app: &AppHandle, dw: f64, dh: f64) {
-    let Some(w) = app.get_webview_window("prompter") else { return };
+fn move_by(w: &WebviewWindow, dx: f64, dy: f64) {
     let (Ok(pos), Ok(size), Ok(scale)) = (w.outer_position(), w.outer_size(), w.scale_factor()) else { return };
-    let logical: LogicalSize<f64> = size.to_logical(scale);
-    // Same limits as the window's own minimum size in tauri.conf.json.
-    let mut nw = (logical.width + dw).max(260.0);
-    let mut nh = (logical.height + dh).max(120.0);
-    if let Some((l, t, r, b)) = desktop_bounds(&w) {
-        nw = nw.min((r - l) as f64 / scale);
-        nh = nh.min((b - t) as f64 / scale);
-    }
+    let Some(area) = home_area(w) else { return };
+    let x = pos.x.saturating_add((dx * scale).round() as i32);
+    let y = pos.y.saturating_add((dy * scale).round() as i32);
+    let fitted = fit(x, y, size.width, size.height, area);
+    place(w, fitted, fitted.2 != size.width || fitted.3 != size.height);
+}
+
+fn resize_by(w: &WebviewWindow, dw: f64, dh: f64) {
+    let (Ok(pos), Ok(size), Ok(scale)) = (w.outer_position(), w.outer_size(), w.scale_factor()) else { return };
+    let Some(area) = home_area(w) else { return };
+    let (min_w, min_h) = min_size(scale);
+    let want_w = (size.width as f64 + dw * scale).round().max(min_w as f64) as u32;
+    let want_h = (size.height as f64 + dh * scale).round().max(min_h as f64) as u32;
     // Grow and shrink around the middle of the top edge, so it stays under the webcam.
-    let new_size: PhysicalSize<u32> = LogicalSize::new(nw, nh).to_physical(scale);
-    let x = pos.x - (new_size.width as i32 - size.width as i32) / 2;
-    let _ = w.set_size(new_size);
-    let p: LogicalPosition<f64> = PhysicalPosition::new(x, pos.y).to_logical(scale);
-    let _ = w.set_position(p);
+    let x = pos.x + (size.width as i32 - want_w as i32) / 2;
+    place(w, fit(x, pos.y, want_w, want_h, area), true);
+}
+
+fn top_centre(w: &WebviewWindow) {
+    let (Ok(size), Some(area)) = (w.outer_size(), main_area(w)) else { return };
+    let (l, t, r, _) = area;
+    let x = l + (r - l - size.width as i32) / 2;
+    let fitted = fit(x, t + 16, size.width, size.height, area);
+    place(w, fitted, fitted.2 != size.width || fitted.3 != size.height);
+}
+
+/// Brings the prompter back to the middle of the main screen wherever it was, even on a
+/// screen that's been unplugged. If it's bigger than the screen it goes back to its usual size.
+fn middle(w: &WebviewWindow) {
+    let (Ok(size), Ok(scale), Some(area)) = (w.outer_size(), w.scale_factor(), main_area(w)) else { return };
+    let (l, t, r, b) = area;
+    let (aw, ah) = ((r - l) as u32, (b - t) as u32);
+    let (mut width, mut height) = (size.width, size.height);
+    if width > aw || height > ah {
+        let usual: PhysicalSize<u32> = LogicalSize::new(1000.0, 360.0).to_physical(scale);
+        width = usual.width.min(aw * 9 / 10);
+        height = usual.height.min(ah * 6 / 10);
+    }
+    let (min_w, min_h) = min_size(scale);
+    width = width.max(min_w.min(aw));
+    height = height.max(min_h.min(ah));
+    let x = l + (aw as i32 - width as i32) / 2;
+    let y = t + (ah as i32 - height as i32) / 2;
+    place(w, fit(x, y, width, height, area), true);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fit;
+
+    #[test]
+    fn fit_keeps_the_whole_window_on_screen() {
+        let area = (0, 0, 1920, 1040);
+        assert_eq!(fit(-5000, -5000, 1000, 360, area), (0, 0, 1000, 360));
+        assert_eq!(fit(5000, 5000, 1000, 360, area), (920, 680, 1000, 360));
+        assert_eq!(fit(100, 100, 1000, 360, area), (100, 100, 1000, 360));
+        // Bigger than the screen: shrunk to fit, then placed at its corner.
+        assert_eq!(fit(300, 300, 4000, 3000, area), (0, 0, 1920, 1040));
+        // A second screen to the left of the main one.
+        assert_eq!(fit(-3000, 50, 800, 300, (-1280, 0, 0, 1024)), (-1280, 50, 800, 300));
+    }
+
+    #[test]
+    fn repeated_moves_and_resizes_stay_inside_offset_work_area() {
+        let area = (-1920, 40, 0, 1080);
+        let (mut x, mut y, mut width, mut height) = (-1200, 200, 1000, 360);
+        for (dx, dy) in [(240, 240), (-240, -240), (240, -240), (-240, 240)] {
+            for _ in 0..200 {
+                (x, y, width, height) = fit(x + dx, y + dy, width + 40, height + 40, area);
+                assert!(x >= area.0 && y >= area.1);
+                assert!(x + width as i32 <= area.2 && y + height as i32 <= area.3);
+            }
+        }
+    }
 }
 
 // ---------- Wiring ----------

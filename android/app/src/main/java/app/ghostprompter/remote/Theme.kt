@@ -1,57 +1,69 @@
 package app.ghostprompter.remote
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
-// The desktop app's colours: navy dark, white light, a blue accent from the logo, green for go.
-private val Dark = darkColorScheme(
-    primary = Color(0xFF3D78E7),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF1B3366),
-    onPrimaryContainer = Color(0xFFDCE6FF),
-    secondaryContainer = Color(0xFF1B2A4A),
-    onSecondaryContainer = Color(0xFFEAF0FC),
-    tertiary = Color(0xFFE9B75F),
-    background = Color(0xFF0B1224),
-    onBackground = Color(0xFFEAF0FC),
-    surface = Color(0xFF101B31),
-    onSurface = Color(0xFFEAF0FC),
-    surfaceVariant = Color(0xFF1A2741),
-    onSurfaceVariant = Color(0xFFB5C3DA),
-    surfaceContainerHighest = Color(0xFF1A2741),
-    outline = Color(0xFF3A4A68),
-    outlineVariant = Color(0xFF29364E),
-    error = Color(0xFFFF9CA9),
-)
+val Ink = Color(0xFF17223B)
+val GoGreen = Color(0xFF167151)
+val SoftBlue = Color(0xFFECF1FF)
 
 private val Light = lightColorScheme(
-    primary = Color(0xFF2463D4),
+    primary = Color(0xFF315CE8),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE6FB),
-    onPrimaryContainer = Color(0xFF0E3A8C),
-    secondaryContainer = Color(0xFFE3ECFB),
-    onSecondaryContainer = Color(0xFF1953BD),
-    tertiary = Color(0xFF91641C),
-    background = Color(0xFFF7F9FC),
-    onBackground = Color(0xFF202B42),
+    primaryContainer = Color(0xFFE8EEFF),
+    onPrimaryContainer = Ink,
+    secondary = Ink,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFEDF0F6),
+    onSecondaryContainer = Ink,
+    tertiary = Color(0xFF926019),
+    tertiaryContainer = Color(0xFFFFF1D5),
+    onTertiaryContainer = Color(0xFF704B13),
+    background = Color(0xFFF6F5F2),
+    onBackground = Ink,
     surface = Color.White,
-    onSurface = Color(0xFF202B42),
-    surfaceVariant = Color(0xFFEEF2F8),
-    onSurfaceVariant = Color(0xFF52617A),
-    surfaceContainerHighest = Color(0xFFEEF2F8),
-    outline = Color(0xFFC9D2E0),
-    outlineVariant = Color(0xFFE0E6EF),
-    error = Color(0xFFB9384C),
+    onSurface = Ink,
+    surfaceVariant = Color(0xFFF0F2F7),
+    onSurfaceVariant = Color(0xFF606A7C),
+    surfaceContainer = Color.White,
+    surfaceContainerHigh = Color(0xFFF0F2F7),
+    surfaceContainerHighest = Color(0xFFE6EAF2),
+    outline = Color(0xFFADB6C6),
+    outlineVariant = Color(0xFFE5E8EE),
+    error = Color(0xFFBA3347),
 )
 
-/** Green for Play, like the desktop app's Start Prompting button. */
-val GoGreen = Color(0xFF1F8A5B)
+private fun type(size: Int, height: Int, weight: FontWeight = FontWeight.Normal) = TextStyle(
+    fontFamily = FontFamily.SansSerif,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = height.sp,
+)
+
+private val Type = Typography(
+    displaySmall = type(44, 50, FontWeight.ExtraBold).copy(letterSpacing = (-2).sp),
+    headlineLarge = type(32, 38, FontWeight.ExtraBold).copy(letterSpacing = (-1).sp),
+    headlineMedium = type(28, 34, FontWeight.ExtraBold),
+    headlineSmall = type(24, 30, FontWeight.Bold),
+    titleLarge = type(22, 28, FontWeight.Bold),
+    titleMedium = type(17, 24, FontWeight.Bold),
+    titleSmall = type(14, 20, FontWeight.Bold),
+    bodyLarge = type(16, 24),
+    bodyMedium = type(14, 21),
+    bodySmall = type(12, 18),
+    labelLarge = type(14, 20, FontWeight.Bold),
+    labelMedium = type(12, 16, FontWeight.Bold),
+    labelSmall = type(11, 16, FontWeight.Bold).copy(letterSpacing = 1.sp),
+)
 
 @Composable
 fun GhostTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, content = content)
+    MaterialTheme(colorScheme = Light, typography = Type, content = content)
 }

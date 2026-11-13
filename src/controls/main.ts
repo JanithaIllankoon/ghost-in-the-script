@@ -176,7 +176,7 @@ document.getElementById("app")!.innerHTML = `
         <button class="btn primary" id="btn-new">${ICONS.plus}<span>New Script</span></button>
         <button class="btn quiet" id="btn-import">${ICONS.upload}<span>Import File</span></button>
       </div>
-      <div class="list-head" id="list-head">SCRIPTS</div>
+      <div class="list-head" id="list-head">Scripts</div>
       <div class="search-wrap">
         ${ICONS.search}
         <input class="search" id="search" type="search" placeholder="Search Scripts..." aria-label="Search scripts" />
@@ -643,7 +643,7 @@ const TABS: { id: string; label: string; fields: Field[] }[] = [
     fields: [
       { type: "custom", render: () => note("Speech recognition runs on this PC. Nothing you say leaves it.") },
       { type: "group", title: "Microphone", fields: [
-        { type: "select", key: "micDevice", label: "Microphone", options: () => [["", "Windows default"], ...micDevices.map((d) => [d, d] as [string, string])] },
+        { type: "select", key: "micDevice", label: "Microphone", options: () => [["", "Windows Default"], ...micDevices.map((d) => [d, d] as [string, string])] },
         { type: "custom", render: renderMicTools },
         { type: "range", key: "voiceSensitivity", label: "Sensitivity", min: 0, max: 100, step: 1, unit: "%", hint: "Raise it if quiet speech doesn't scroll. Lower it if background noise does. The gold mark on the level meter is the trigger point." },
       ] },
@@ -777,9 +777,9 @@ function renderRemote(): HTMLElement {
   const addr = el("div", "hint");
   const actions = el("div", "remote-actions");
   actions.append(
-    button("Show Code on the Prompter", () => invoke("remote_show_pairing").catch((e) => toast(String(e), true))),
+    button("Show Code on Prompter", () => invoke("remote_show_pairing").catch((e) => toast(String(e), true))),
     button("New Pairing Code", async () => {
-      const ok = await confirmDialog("Make a new pairing code?", "Phones paired with the old code are disconnected and need to scan the new one.", "New Code", false);
+      const ok = await confirmDialog("New Pairing Code?", "Phones paired with the old code are disconnected and need to scan the new one.", "New Code", false);
       if (!ok) return;
       remote = await invoke<RemoteInfo>("remote_new_code").catch(() => remote);
       refreshFields();
@@ -987,7 +987,7 @@ function openSettings(tab?: string) {
 }
 async function closeSettings() {
   if (settingsDirty()) {
-    const ok = await confirmDialog("Discard unsaved changes?", "Your settings go back to how they were when you last pressed Save.", "Discard Changes");
+    const ok = await confirmDialog("Discard Unsaved Changes?", "Your settings go back to how they were when you last pressed Save.", "Discard Changes");
     if (!ok) return;
     revertSettings();
   }
@@ -1025,7 +1025,7 @@ $("drawer-backdrop").addEventListener("mousedown", (e) => {
   if (e.target === e.currentTarget) closeSettings();
 });
 $("btn-reset").onclick = async () => {
-  const ok = await confirmDialog("Reset all settings?", "Text, colours, voice, window and hotkey settings go back to their defaults. Your scripts are kept. Press Save afterwards to keep the defaults.", "Reset Settings");
+  const ok = await confirmDialog("Reset All Settings?", "Text, colours, voice, window and hotkey settings go back to their defaults. Your scripts are kept. Press Save afterwards to keep the defaults.", "Reset Settings");
   if (!ok) return;
   data.settings = { ...DEFAULT_SETTINGS, hotkeys: { ...DEFAULT_HOTKEYS } };
   pushSettings();
