@@ -114,6 +114,29 @@ Marks pair up within a paragraph. A mark with no partner, like the star in `5 * 
 
 The built-in speech model is English. For another language, or better accuracy, download a model from the [Vosk model list](https://alphacephei.com/vosk/models), unzip it, and paste the folder path under **Settings > Voice > Speech Model Folder**.
 
+## Phone remote
+
+Control the prompter from your Android phone with the **Ghost Remote** app while you stand away from the PC. Download `Ghost-Remote_x.y.z.apk` from the [latest release](https://github.com/JanithaIllankoon/ghost-in-the-script/releases/latest) and install it on your phone. Android may ask you to allow installs from your browser or file manager first.
+
+1. On the PC, open **Settings > Remote** and turn on **Allow a Phone to Control the Prompter**. The pairing QR code appears on the prompter and in Settings.
+2. In Ghost Remote, press **Scan QR Code** and scan it.
+
+The phone and the PC need to be on the same Wi-Fi. The first time, Windows may ask whether Ghost In The Script can use the network: allow it on private networks. After pairing, the phone reconnects to the same PC on its own.
+
+<p align="center">
+  <img src="docs/v1.6.0/remote-read.png" width="260" alt="Ghost Remote's Read tab: elapsed time, total and progress on one line, a seek slider, back, play and next buttons, Stop and Rewind, and the reading pace" />
+  &nbsp;
+  <img src="docs/v1.6.0/remote-position.png" width="260" alt="Ghost Remote's Position tab: arrows to move the prompter, a button to put it at the top centre, Reset to Screen Centre, and width and height buttons" />
+  &nbsp;
+  <img src="docs/v1.6.0/remote-latency.png" width="260" alt="Ghost Remote's Latency Log: network ping and control response times, with a list of recent commands and how long each took" />
+</p>
+
+- **Read:** play and pause, the time so far with the total and how far through you are, a slider to jump anywhere in the script, back or forward one line, **Stop & Rewind**, reading pace, and scroll mode.
+- **Position:** move the prompter, put it at the top centre of the screen, **Reset to Screen Centre** if it ends up somewhere you can't reach, change its width and height, and turn click-through on or off. **Fine Adjustment** makes each step smaller.
+- **Latency Log** (the ⋮ menu): how quickly the PC answers, for pings and for each control, with **Copy Log** to share it.
+
+The phone can only drive the prompter. It can't show or hide windows or reach the main window, and nothing connects without the pairing code. **New Pairing Code** in Settings disconnects phones paired with the old one. The connection stays on your local network.
+
 ## Limits
 
 - It can't hide from a camera or phone pointed at your screen, or from a hardware capture card.
@@ -123,7 +146,7 @@ The built-in speech model is English. For another language, or better accuracy, 
 
 ## Your data
 
-Scripts and settings are saved on your PC in `%APPDATA%\app.ghostprompter.desktop\data.json`. The app doesn't connect to the internet. The only exception is the **Star on GitHub** button, which opens this page in your browser.
+Scripts and settings are saved on your PC in `%APPDATA%\app.ghostprompter.desktop\data.json`. The app doesn't connect to the internet. The only exception is the **Star on GitHub** button, which opens this page in your browser. Phone Remote, while it's on, only talks to phones on your local network.
 
 ## Build it yourself
 
