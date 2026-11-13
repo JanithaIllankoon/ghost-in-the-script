@@ -671,3 +671,15 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Phone Remote ---------- */
+.field.remote[hidden], .remote-qr[hidden], .remote-actions[hidden] { display: none; }
+.remote-box { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+/* Dark on white in both themes so phone cameras read it. */
+.remote-qr { flex: none; width: 168px; height: 168px; padding: 0; border-radius: 10px; background: #fff; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.remote-qr svg { display: block; width: 100%; height: 100%; }
+.remote-info { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.remote-state { font-size: 13.5px; font-weight: 600; color: var(--ghost); }
+.remote-state.good { color: var(--ok); }
+.remote-state.bad { color: var(--danger); }
+.remote-actions { display: flex; gap: 8px; flex-wrap: wrap; }

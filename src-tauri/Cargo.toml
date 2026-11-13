@@ -1,6 +1,6 @@
 [package]
 name = "ghost-in-the-script"
-version = "1.5.2"
+version = "1.6.0"
 description = "A teleprompter overlay that stays out of screen recordings"
 authors = ["Janitha Illankoon"]
 license = "MIT"
@@ -24,6 +24,12 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 cpal = "0.16"
 libloading = "0.8"
+tokio = { version = "1.54.1", features = ["net", "sync", "time", "macros", "rt"] }
+tokio-tungstenite = "0.30.0"
+futures-util = "0.3.34"
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+getrandom = "0.3"
+local-ip-address = "0.6.13"
 
 [profile.release]
 opt-level = 3

@@ -10,3 +10,12 @@ src-tauri/resources/vosk/
 # Local tooling
 .claude/
 *.log
+
+# Android remote app: build output, local SDK path, and the release signing key (back these two up privately)
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/*.jks

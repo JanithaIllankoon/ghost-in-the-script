@@ -19,6 +19,7 @@ import {
   type Action,
   type PrompterCommand,
   type PrompterStatus,
+  type RemoteInfo,
   type ScrollMode,
   type Settings,
 } from "../shared/types";
@@ -72,6 +73,20 @@ document.getElementById("app")!.innerHTML = `
       <div class="help-card">
         <div class="help-head"><h2>Shortcuts and Gestures</h2><button id="help-close" aria-label="Close" title="Close">${ICON.close}</button></div>
         <div class="help-body" id="help-body"></div>
+      </div>
+    </div>
+    <div id="pair" role="dialog" aria-labelledby="pair-title" hidden>
+      <div class="pair-card">
+        <div class="pair-qr" id="pair-qr"></div>
+        <div class="pair-text">
+          <div class="pair-head"><h2 id="pair-title">Pair Your Phone</h2><button id="pair-close" aria-label="Close" title="Close">${ICON.close}</button></div>
+          <ol>
+            <li>Open <b>Ghost Remote</b> on your Android phone.</li>
+            <li>Tap <b>Scan QR Code</b> and point the camera here.</li>
+            <li>Keep the phone on the same Wi-Fi as this PC.</li>
+          </ol>
+          <p class="pair-addr" id="pair-addr"></p>
+        </div>
       </div>
     </div>
     <button class="side-arrow left" id="side-prev" title="Back one line" aria-label="Back one line">${ICON.chevL}</button>
@@ -754,10 +769,47 @@ listen<PrompterCommand>("gp:cmd", (e) => {
   else if (c.type === "pause") stop();
   else if (c.type === "seek") seek(c.fraction);
   else if (c.type === "set-mode") setMode(c.mode);
-  else runAction(c.type);
+  else if (c.type === "set-speed") patchSettings({ speed: Math.min(100, Math.max(1, Math.round(c.speed))) });
+  else if (c.type === "set-click-through") {
+    if (c.on !== settings.clickThrough) runAction("toggle-click-through");
+  } else if (c.type !== "status") runAction(c.type);
   sendStatus();
 });
 listen<string>("gp:hotkey", (e) => runAction(e.payload));
+
+// ---------- Phone Remote ----------
+let remotePhones: string[] = [];
+function closePair() {
+  $("pair").hidden = true;
+}
+listen<RemoteInfo>("gp:remote-pair", (e) => {
+  const r = e.payload;
+  if (!r.running || !r.qrSvg) return;
+  $("pair-qr").innerHTML = r.qrSvg;
+  $("pair-addr").textContent = r.addresses.length
+    ? `This PC: ${r.addresses[0]}:${r.port}`
+    : "This PC doesn't seem to be on a network. Connect it to Wi-Fi first.";
+  closeHelp();
+  $("pair").hidden = false;
+  $("pair-close").focus();
+});
+listen<RemoteInfo>("gp:remote-state", (e) => {
+  const r = e.payload;
+  const added = r.phones.filter((p) => !remotePhones.includes(p));
+  const gone = remotePhones.length > r.phones.length;
+  remotePhones = r.phones;
+  if (!r.running) closePair();
+  if (added.length) {
+    closePair();
+    toast(`${added[0]} connected as a remote`);
+  } else if (gone && r.running) {
+    toast("Phone remote disconnected");
+  }
+});
+$("pair-close").onclick = () => closePair();
+$("pair").addEventListener("mousedown", (ev) => {
+  if (ev.target === ev.currentTarget) closePair();
+});
 
 // Toolbar
 $("tb-play").onclick = () => togglePlay();
@@ -1012,6 +1064,7 @@ window.addEventListener("keydown", (ev) => {
     if (k === "Escape" || k === "?") { ev.preventDefault(); closeHelp(); }
     return;
   }
+  if (!$("pair").hidden && k === "Escape") { ev.preventDefault(); closePair(); return; }
   if ((ev.ctrlKey && (k === "/" || ev.code === "Slash")) || k === "?") { ev.preventDefault(); openHelp(); return; }
   if (k === " ") { ev.preventDefault(); if (tipShowing) dismissTip(); togglePlay(); }
   else if (k === "ArrowUp" || k === "+" || k === "=") changeSpeed(+1);

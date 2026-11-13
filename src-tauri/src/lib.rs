@@ -1,6 +1,7 @@
 mod capture;
 mod hotkeys;
 mod overlay;
+mod remote;
 mod store;
 mod voice;
 mod vosk;
@@ -34,6 +35,8 @@ pub fn toggle_window<R: Runtime>(app: &AppHandle<R>, label: &str) {
 #[link(name = "user32")]
 extern "system" {
     fn ShowWindow(hwnd: *mut std::ffi::c_void, cmd: i32) -> i32;
+    fn GetForegroundWindow() -> *mut std::ffi::c_void;
+    fn SetForegroundWindow(hwnd: *mut std::ffi::c_void) -> i32;
 }
 const SW_SHOWNOACTIVATE: i32 = 4;
 
@@ -51,6 +54,26 @@ fn restore_prompter<R: Runtime>(window: &tauri::Window<R>) {
     });
 }
 
+/// Shows the prompter without taking focus from the app in front, for the phone remote:
+/// Panopto or PowerPoint should stay focused while the prompter appears over them.
+pub fn show_prompter_quietly<R: Runtime>(app: &AppHandle<R>) {
+    let Some(w) = app.get_webview_window("prompter") else { return };
+    if w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false) {
+        return;
+    }
+    let w2 = w.clone();
+    let _ = w.run_on_main_thread(move || {
+        let before = unsafe { GetForegroundWindow() };
+        if w2.is_minimized().unwrap_or(false) {
+            let _ = w2.unminimize();
+        }
+        let _ = w2.show();
+        if !before.is_null() {
+            unsafe { SetForegroundWindow(before) };
+        }
+    });
+}
+
 #[tauri::command]
 fn wake_prompter(app: AppHandle) -> Result<(), String> {
     let w = app.get_webview_window("prompter").ok_or("No prompter window")?;
@@ -60,6 +83,7 @@ fn wake_prompter(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     voice::stop_all(&app);
+    remote::shutdown(&app);
     app.exit(0);
 }
 
@@ -145,6 +169,7 @@ Click to open. Right-click for more.")
             }
             "quit" => {
                 voice::stop_all(app);
+                remote::shutdown(app);
                 app.exit(0);
             }
             _ => {}
@@ -186,6 +211,7 @@ pub fn run() {
         .manage(TaskbarHidden(AtomicBool::new(true)))
         .manage(hotkeys::HotkeyMap::default())
         .manage(voice::VoiceState::default())
+        .manage(remote::RemoteState::default())
         .invoke_handler(tauri::generate_handler![
             store::load_data,
             store::save_data,
@@ -200,6 +226,10 @@ pub fn run() {
             open_github,
             set_taskbar_hidden,
             wake_prompter,
+            remote::remote_set_enabled,
+            remote::remote_info,
+            remote::remote_new_code,
+            remote::remote_show_pairing,
         ])
         .setup(|app| {
             place_prompter_first_run(app.handle());
@@ -207,6 +237,7 @@ pub fn run() {
                 overlay::watch_photos(window)?;
             }
             build_tray(app)?;
+            remote::init(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {

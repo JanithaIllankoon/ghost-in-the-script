@@ -118,6 +118,8 @@ export interface Settings {
   allowScreenshots: boolean;
   /** Keep both windows off the taskbar so recordings can't show a taskbar button. */
   hideFromTaskbar: boolean;
+  /** Phone Remote: lets the Ghost Remote Android app on the same Wi-Fi control the prompter. */
+  remoteEnabled: boolean;
 
   // One-time tips (not shown in settings)
   /** How many of the prompter's first-run tips have been seen (moving it, Click Through, reading guide). */
@@ -177,6 +179,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideControlsFromCapture: true,
   allowScreenshots: false,
   hideFromTaskbar: true,
+  remoteEnabled: false,
 
   prompterTipsSeen: 0,
   seenTrayTip: false,
@@ -290,9 +293,26 @@ export interface PrompterStatus {
   visible: boolean;
 }
 
+/** Phone Remote server state, from the Rust side. */
+export interface RemoteInfo {
+  running: boolean;
+  port: number;
+  /** This PC's network addresses, best first. */
+  addresses: string[];
+  /** Pairing QR code as SVG markup, empty while off. */
+  qrSvg: string;
+  /** Names of the phones connected right now. */
+  phones: string[];
+  error: string | null;
+}
+
 export type PrompterCommand =
   | { type: Action }
   | { type: "play" }
   | { type: "pause" }
   | { type: "seek"; fraction: number }
-  | { type: "set-mode"; mode: ScrollMode };
+  | { type: "set-mode"; mode: ScrollMode }
+  | { type: "set-speed"; speed: number }
+  | { type: "set-click-through"; on: boolean }
+  /** Just send a fresh status (a phone remote connected). */
+  | { type: "status" };

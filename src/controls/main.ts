@@ -23,6 +23,7 @@ import {
   type HotkeyProblem,
   type PrompterCommand,
   type PrompterStatus,
+  type RemoteInfo,
   type ScrollMode,
   type Script,
   type Settings,
@@ -102,6 +103,8 @@ function set<K extends keyof Settings>(key: K, value: Settings[K]) {
   if (key === "hidePrompterFromCapture" || key === "hideControlsFromCapture") applyCapture();
   if (key === "hideFromTaskbar") applyTaskbar();
   if (key === "allowScreenshots") applyCapture();
+  // Turning Phone Remote on shows the pairing code on the prompter, ready to scan.
+  if (key === "remoteEnabled") applyRemote().then(() => { if (S().remoteEnabled && remote.running) invoke("remote_show_pairing").catch(() => {}); });
   refreshFields();
 }
 
@@ -187,7 +190,7 @@ document.getElementById("app")!.innerHTML = `
       <div class="side-foot">
         ${creditHtml()}
         <div class="side-row">
-          <span class="version">v1.5.2</span>
+          <span class="version">v1.6.0</span>
           <button class="theme-toggle" id="theme-toggle" role="switch" aria-checked="false" aria-label="Dark mode">
             ${ICONS.moon}<span id="theme-label">Light Mode</span><span class="theme-track" aria-hidden="true"><span></span></span>
           </button>
@@ -687,6 +690,16 @@ const TABS: { id: string; label: string; fields: Field[] }[] = [
     ],
   },
   {
+    id: "remote", label: "Remote",
+    fields: [
+      { type: "custom", render: () => note("Control the prompter from your Android phone with the <b>Ghost Remote</b> app: play, pause, speed, scroll mode, click-through, and moving or resizing the prompter. The phone and this PC need to be on the same Wi-Fi.") },
+      { type: "group", title: "Phone Remote", fields: [
+        { type: "toggle", key: "remoteEnabled", label: "Allow a Phone to Control the Prompter", hint: "The first time, Windows may ask whether Ghost In The Script can use the network. Allow it on private networks, or the phone can't connect." },
+        { type: "custom", render: renderRemote },
+      ] },
+    ],
+  },
+  {
     id: "hotkeys", label: "Hotkeys",
     fields: [
       { type: "custom", render: () => note("These work from <b>any app</b>, even while Panopto is recording. Select a box, then press the new keys. Backspace removes a hotkey. Escape cancels.") },
@@ -752,6 +765,75 @@ function renderMicTools(): HTMLElement {
   });
   return wrap;
 }
+
+let remote: RemoteInfo = { running: false, port: 0, addresses: [], qrSvg: "", phones: [], error: null };
+
+function renderRemote(): HTMLElement {
+  const wrap = el("div", "field remote");
+  const box = el("div", "remote-box");
+  const qr = el("div", "remote-qr");
+  const info = el("div", "remote-info");
+  const state = el("div", "remote-state");
+  const addr = el("div", "hint");
+  const actions = el("div", "remote-actions");
+  actions.append(
+    button("Show Code on the Prompter", () => invoke("remote_show_pairing").catch((e) => toast(String(e), true))),
+    button("New Pairing Code", async () => {
+      const ok = await confirmDialog("Make a new pairing code?", "Phones paired with the old code are disconnected and need to scan the new one.", "New Code", false);
+      if (!ok) return;
+      remote = await invoke<RemoteInfo>("remote_new_code").catch(() => remote);
+      refreshFields();
+      toast("New pairing code made");
+    }),
+  );
+  info.append(state, addr, actions);
+  box.append(qr, info);
+  wrap.append(box);
+  let shownSvg = "";
+  refreshers.push(() => {
+    const on = S().remoteEnabled;
+    wrap.hidden = !on && !remote.error;
+    box.classList.toggle("off", !remote.running);
+    if (remote.qrSvg !== shownSvg) {
+      shownSvg = remote.qrSvg;
+      qr.innerHTML = remote.qrSvg;
+    }
+    qr.hidden = !remote.running;
+    actions.hidden = !remote.running;
+    if (remote.error && on) {
+      state.className = "remote-state bad";
+      state.textContent = remote.error;
+      addr.textContent = "";
+    } else if (!remote.running) {
+      state.className = "remote-state";
+      state.textContent = on ? "Starting…" : "Off";
+      addr.textContent = "";
+    } else {
+      const n = remote.phones.length;
+      state.className = `remote-state ${n ? "good" : ""}`;
+      state.textContent = n ? `Connected: ${remote.phones.join(", ")}` : "Waiting for a phone. Scan the code with Ghost Remote.";
+      addr.textContent = remote.addresses.length
+        ? `This PC: ${remote.addresses[0]}, port ${remote.port}`
+        : "This PC doesn't seem to be on a network. Connect it to Wi-Fi first.";
+    }
+  });
+  return wrap;
+}
+
+async function applyRemote() {
+  try {
+    remote = await invoke<RemoteInfo>("remote_set_enabled", { enabled: S().remoteEnabled });
+  } catch (e) {
+    remote = { ...remote, running: false, error: String(e) };
+    toast(`Couldn't start Phone Remote: ${e}`, true);
+  }
+  refreshFields();
+}
+
+listen<RemoteInfo>("gp:remote-state", (e) => {
+  remote = e.payload;
+  refreshFields();
+});
 
 function comboFromEvent(e: KeyboardEvent): string | null {
   const k = e.key;
@@ -921,6 +1003,7 @@ function revertSettings() {
   applyCapture();
   applyTaskbar();
   applyHotkeys();
+  applyRemote();
   refreshFields();
 }
 function updateSaveState() {
@@ -1738,6 +1821,7 @@ async function init() {
   applyCapture();
   applyTaskbar();
   applyHotkeys();
+  if (S().remoteEnabled) applyRemote();
   loadDevices();
   setInterval(renderList, 60000);
   splash.ready();
