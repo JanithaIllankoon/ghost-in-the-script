@@ -628,8 +628,24 @@ setInterval(async () => {
     if (!visible) stop();
     syncVoice(); // release the microphone while hidden
   }
+  checkStuckHidden();
   sendStatus();
 }, 400);
+
+// Some apps (Windows Photos, for one) opening or closing over the prompter can leave the
+// WebView thinking it's covered, so it stops drawing while the window is still up.
+// If the page is told it's hidden while the window is showing, wake it back up.
+let lastWake = 0;
+async function checkStuckHidden() {
+  if (document.visibilityState !== "hidden" || !visible) return;
+  if (Date.now() - lastWake < 2000) return;
+  if (await win.isMinimized().catch(() => false)) return;
+  lastWake = Date.now();
+  invoke("wake_prompter").catch(() => {});
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") setTimeout(checkStuckHidden, 300);
+});
 
 // ---------- Voice ----------
 let voiceTimer: number | undefined;

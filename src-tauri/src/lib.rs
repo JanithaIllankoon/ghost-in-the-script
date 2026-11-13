@@ -30,6 +30,40 @@ pub fn toggle_window<R: Runtime>(app: &AppHandle<R>, label: &str) {
     }
 }
 
+#[link(name = "user32")]
+extern "system" {
+    fn ShowWindow(hwnd: *mut std::ffi::c_void, cmd: i32) -> i32;
+}
+const SW_SHOWNOACTIVATE: i32 = 4;
+
+/// The prompter has no taskbar button and no minimise button, so if something else
+/// minimises it (some apps do while they open or close full screen) it would be stuck as
+/// a tiny bar in a corner. Put it back without taking focus from the app in front.
+fn restore_prompter<R: Runtime>(window: &tauri::Window<R>) {
+    let w = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        if let Ok(hwnd) = w.hwnd() {
+            unsafe { ShowWindow(hwnd.0 as *mut std::ffi::c_void, SW_SHOWNOACTIVATE) };
+        }
+        // Lets the window library re-read the state, so it doesn't think it's still minimised.
+        let _ = w.unminimize();
+    });
+}
+
+/// WebView2 can decide the prompter is covered after another app (Windows Photos, for one)
+/// opens or closes over it, and then stops drawing it even though the window is showing.
+/// Flipping the WebView's visibility makes it draw again, like hiding and showing does.
+#[tauri::command]
+fn wake_prompter(app: AppHandle) -> Result<(), String> {
+    let w = app.get_webview_window("prompter").ok_or("No prompter window")?;
+    w.with_webview(|pw| unsafe {
+        let c = pw.controller();
+        let _ = c.SetIsVisible(false);
+        let _ = c.SetIsVisible(true);
+    })
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     voice::stop_all(&app);
@@ -172,6 +206,7 @@ pub fn run() {
             run_action,
             open_github,
             set_taskbar_hidden,
+            wake_prompter,
         ])
         .setup(|app| {
             place_prompter_first_run(app.handle());
@@ -182,6 +217,9 @@ pub fn run() {
             // Without a taskbar button a minimised window would park in a corner of the
             // desktop, so send it to the tray instead. The tray icon or Ctrl+Alt+O brings it back.
             if let WindowEvent::Resized(_) = event {
+                if window.label() == "prompter" && window.is_minimized().unwrap_or(false) {
+                    restore_prompter(window);
+                }
                 let hidden = window.app_handle().state::<TaskbarHidden>().0.load(Ordering::SeqCst);
                 if hidden && window.label() == "main" && window.is_minimized().unwrap_or(false) {
                     let _ = window.hide();

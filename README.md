@@ -13,7 +13,11 @@
   <a href="https://github.com/JanithaIllankoon/ghost-in-the-script/releases/latest"><b>Download for Windows</b></a>
 </p>
 
-> **AI-assisted project.** Ghost In The Script was designed and written with the help of an AI coding assistant (Claude, by Anthropic), directed, reviewed and tested by Janitha Illankoon.
+<p align="center">
+  ✅ Tested and verified working with <b>Panopto</b>, <b>Zoom</b>, <b>Microsoft Teams</b> and <b>OBS Studio</b>.
+</p>
+
+> **AI-assisted project.** I built Ghost In The Script with the help of an AI coding assistant (Claude, by Anthropic). Much of the code was written with Claude; I directed the design, reviewed the code, fixed issues by hand and tested every release.
 
 ---
 
@@ -27,7 +31,7 @@ You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right 
 
 **Light and dark themes.** v1.5.0 added a clean workspace, and v1.5.1 reworks it into a sidebar with your scripts, an editor card, and a Present panel with scrolling-mode cards and speed and text size sliders. Use the switch at the bottom of the sidebar to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. The prompter has its own light/dark button on its toolbar; it swaps the prompter's text, background, cue, highlight, guide and outline colours. The letter outline colour can also be set under **Settings > Text > Outline Colour**.
 
-**Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The **Recording protection** switch in the Present panel is green while it's on and red when it's off. Tested with Panopto.
+**Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The **Recording protection** switch in the Present panel is green while it's on and red when it's off. Tested with Panopto, Zoom, Microsoft Teams and OBS Studio.
 
 **Screenshots on request.** Because the hiding covers screenshots too, v1.5.1 adds an **Allow Screenshots** switch under **Settings > Window**. While it's on, the prompter and the main window show up in Print Screen and Snipping Tool (and in recordings, so turn it off before you record). **Ctrl+Alt+S** flips it from any app.
 

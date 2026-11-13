@@ -1682,8 +1682,10 @@ async function showPrompter(focus = false) {
 $("btn-prompter").onclick = async () => {
   const w = await Window.getByLabel("prompter");
   if (!w) return;
-  if (await w.isVisible()) await w.hide();
+  // A minimised prompter counts as hidden, so one click always brings it back.
+  if ((await w.isVisible()) && !(await w.isMinimized())) await w.hide();
   else {
+    await w.unminimize().catch(() => {});
     await w.show();
     await w.setFocus();
   }
