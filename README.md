@@ -11,6 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/JanithaIllankoon/ghost-in-the-script/releases/latest"><b>Download for Windows</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://janithaillankoon.dev/ghost-in-the-script/">Product page</a>
 </p>
 
 <p align="center">
@@ -23,13 +25,15 @@
 
 You record a lecture in Panopto (or OBS, Teams, Zoom). Your script floats right under your webcam so you can read it while looking at the camera. The recording only shows your slides.
 
-![The prompter and its toolbar floating over the main window while the script scrolls in Voice Activated mode](docs/v1.5.2/light.png)
+![The prompter and its toolbar floating over the main window in the light theme](docs/v1.6.0/overlay-light.png)
 
-![The main window with scripts and navigation on the left, the editor in the middle and the Present panel on the right](docs/v1.5.2/main.png)
+![The main window with scripts and navigation on the left, the formatted script in the middle and the Present panel on the right](docs/v1.6.0/main-light.png)
 
 ## What it does
 
 **Light and dark themes.** v1.5.0 added a clean workspace, and v1.5.1 reworks it into a sidebar with your scripts, an editor card, and a Present panel with scrolling-mode cards and speed and text size sliders. Use the switch at the bottom of the sidebar to choose light or navy dark mode. The choice is remembered and also updates the Windows title bar. The prompter has its own light/dark button on its toolbar; it swaps the prompter's text, background, cue, highlight, guide and outline colours. The letter outline colour can also be set under **Settings > Text > Outline Colour**.
+
+![The main window in navy dark mode](docs/v1.6.0/main-dark.png)
 
 **Hidden from recordings.** The prompter uses a Windows feature (`WDA_EXCLUDEFROMCAPTURE`) that removes a window from every software capture: Panopto, OBS, Teams, Zoom, Snipping Tool and screen sharing all see whatever is behind it. You still see it on your monitor. The **Recording protection** switch in the Present panel is green while it's on and red when it's off. Tested with Panopto, Zoom, Microsoft Teams and OBS Studio.
 
@@ -53,7 +57,7 @@ Speech recognition runs on your PC with [Vosk](https://alphacephei.com/vosk/). N
 
 **Scripts.** A saved library with search, simple formatting, cue notes for yourself, and import from `.txt`, `.md`, `.docx` and `.rtf` (drag and drop works too).
 
-![The prompter overlay with a gold cue and the reading guide arrows](docs/prompter.png)
+![The prompter in its dark theme, with gold cues and the reading guide arrows](docs/v1.6.0/overlay-dark.png)
 
 ## Install
 
@@ -62,7 +66,7 @@ Speech recognition runs on your PC with [Vosk](https://alphacephei.com/vosk/). N
 
 Needs Windows 10 version 2004 or newer, or Windows 11. Windows SmartScreen may warn you because the installer isn't code-signed. Choose **More info**, then **Run anyway**.
 
-If you used an earlier test build called "Ghost Prompter", uninstall it from **Settings > Apps**. Your scripts are kept.
+If you installed one of the early test builds from before the first public release, uninstall it from **Settings > Apps** (it has the same ghost icon). Your scripts are kept.
 
 ## Using it
 
@@ -100,6 +104,11 @@ When the prompter has focus: Space plays and pauses, Up and Down change the spee
 
 Press the eye icon at the bottom right of the editor to preview the script with its formatting applied. Press the pencil icon, or double-click the preview, to go back to the text.
 
+<p align="center">
+  <img src="docs/v1.6.0/editor-light.png" width="49%" alt="The editor showing the script with its formatting marks, such as **bold** and [cue] notes" />
+  <img src="docs/v1.6.0/main-light.png" width="49%" alt="The same script in the formatted preview" />
+</p>
+
 ```
 **bold**   *italic*   __underline__   ==highlight==
 [note to yourself]     shown in gold, skipped by voice tracking
@@ -136,6 +145,10 @@ The phone and the PC need to be on the same Wi-Fi. The first time, Windows may a
 - **Latency Log** (the ⋮ menu): how quickly the PC answers, for pings and for each control, with **Copy Log** to share it.
 
 The phone can only drive the prompter. It can't show or hide windows or reach the main window, and nothing connects without the pairing code. **New Pairing Code** in Settings disconnects phones paired with the old one. The connection stays on your local network.
+
+## Not GhostPrompter
+
+Ghost In The Script is not related to **GhostPrompter**, a separate, paid teleprompter from another developer. Ghost In The Script is free and MIT licensed, and its only official sources are this repository and [janithaillankoon.dev/ghost-in-the-script](https://janithaillankoon.dev/ghost-in-the-script/).
 
 ## Limits
 
